@@ -3,7 +3,7 @@
 #
 
 
-# Copyright (C) 2003-2021 by
+# Copyright (C) 2003-2022 by
 # David Turner, Robert Wilhelm, and Werner Lemberg.
 #
 # This file is part of the FreeType project, and may only be used, modified,
@@ -65,7 +65,7 @@ CFLAGS ?= -c -g -O6 -Wall
 
 # ANSIFLAGS: Put there the flags used to make your compiler ANSI-compliant.
 #
-ANSIFLAGS :=
+ANSIFLAGS ?=
 
 
 # Library linking

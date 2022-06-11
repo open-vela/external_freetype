@@ -1,31 +1,34 @@
 #
-# Copyright (C) 2021 Xiaomi Corporation
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# FreeType 2 build system -- top-level Makefile
 #
 
-include $(APPDIR)/Make.defs
 
-MODULES_CFG = builds/nuttx/modules.cfg
-FTOPTION_H = builds/nuttx/ftoption.h
-CONFIG_MK = builds/nuttx/nuttx.mk
+# Copyright (C) 1996-2022 by
+# David Turner, Robert Wilhelm, and Werner Lemberg.
+#
+# This file is part of the FreeType project, and may only be used, modified,
+# and distributed under the terms of the FreeType project license,
+# LICENSE.TXT.  By continuing to use, modify, or distribute this file you
+# indicate that you have read the license and understand and accept it
+# fully.
 
-include Makefile_
 
-context:: copy_submodule setup
+# Project names
+#
+PROJECT       := freetype
+PROJECT_TITLE := FreeType
 
-register::
+# The variable TOP_DIR holds the path to the topmost directory in the project
+# engine source hierarchy.  If it is not defined, default it to `.'.
+#
+TOP_DIR ?= .
 
-depend::
+# The variable OBJ_DIR gives the location where object files and the
+# FreeType library are built.
+#
+OBJ_DIR ?= $(TOP_DIR)/objs
 
-install::
+
+include $(TOP_DIR)/builds/toplevel.mk
+
+# EOF
