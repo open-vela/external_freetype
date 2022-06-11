@@ -4,7 +4,7 @@
  *
  *   FreeType high-level API and common types (specification only).
  *
- * Copyright (C) 1996-2021 by
+ * Copyright (C) 1996-2022 by
  * David Turner, Robert Wilhelm, and Werner Lemberg.
  *
  * This file is part of the FreeType project, and may only be used,
@@ -153,6 +153,9 @@ FT_BEGIN_HEADER
    *   FT_FACE_FLAG_GLYPH_NAMES
    *   FT_FACE_FLAG_EXTERNAL_STREAM
    *   FT_FACE_FLAG_HINTER
+   *   FT_FACE_FLAG_SVG
+   *   FT_FACE_FLAG_SBIX
+   *   FT_FACE_FLAG_SBIX_OVERLAY
    *
    *   FT_HAS_HORIZONTAL
    *   FT_HAS_VERTICAL
@@ -161,6 +164,9 @@ FT_BEGIN_HEADER
    *   FT_HAS_GLYPH_NAMES
    *   FT_HAS_COLOR
    *   FT_HAS_MULTIPLE_MASTERS
+   *   FT_HAS_SVG
+   *   FT_HAS_SBIX
+   *   FT_HAS_SBIX_OVERLAY
    *
    *   FT_IS_SFNT
    *   FT_IS_SCALABLE
@@ -225,6 +231,7 @@ FT_BEGIN_HEADER
    *   FT_LOAD_NO_SCALE
    *   FT_LOAD_NO_HINTING
    *   FT_LOAD_NO_BITMAP
+   *   FT_LOAD_SBITS_ONLY
    *   FT_LOAD_NO_AUTOHINT
    *   FT_LOAD_COLOR
    *
@@ -522,13 +529,15 @@ FT_BEGIN_HEADER
    *   size.
    *
    * @note:
-   *   An @FT_Face has one _active_ @FT_Size object that is used by functions
-   *   like @FT_Load_Glyph to determine the scaling transformation that in
-   *   turn is used to load and hint glyphs and metrics.
+   *   An @FT_Face has one _active_ `FT_Size` object that is used by
+   *   functions like @FT_Load_Glyph to determine the scaling transformation
+   *   that in turn is used to load and hint glyphs and metrics.
    *
-   *   You can use @FT_Set_Char_Size, @FT_Set_Pixel_Sizes, @FT_Request_Size
+   *   A newly created `FT_Size` object contains only meaningless zero values.
+   *   You must use @FT_Set_Char_Size, @FT_Set_Pixel_Sizes, @FT_Request_Size
    *   or even @FT_Select_Size to change the content (i.e., the scaling
-   *   values) of the active @FT_Size.
+   *   values) of the active `FT_Size`.  Otherwise, the scaling and hinting
+   *   will not be performed.
    *
    *   You can use @FT_New_Size to create additional size objects for a given
    *   @FT_Face, but they won't be used by other functions until you activate
@@ -616,11 +625,12 @@ FT_BEGIN_HEADER
    */
 
 #ifndef FT_ENC_TAG
-#define FT_ENC_TAG( value, a, b, c, d )         \
-          value = ( ( (FT_UInt32)(a) << 24 ) |  \
-                    ( (FT_UInt32)(b) << 16 ) |  \
-                    ( (FT_UInt32)(c) <<  8 ) |  \
-                      (FT_UInt32)(d)         )
+
+#define FT_ENC_TAG( value, a, b, c, d )                             \
+          value = ( ( FT_STATIC_BYTE_CAST( FT_UInt32, a ) << 24 ) | \
+                    ( FT_STATIC_BYTE_CAST( FT_UInt32, b ) << 16 ) | \
+                    ( FT_STATIC_BYTE_CAST( FT_UInt32, c ) <<  8 ) | \
+                      FT_STATIC_BYTE_CAST( FT_UInt32, d )         )
 
 #endif /* FT_ENC_TAG */
 
@@ -730,11 +740,16 @@ FT_BEGIN_HEADER
    *     Same as FT_ENCODING_JOHAB.  Deprecated.
    *
    * @note:
-   *   By default, FreeType enables a Unicode charmap and tags it with
-   *   `FT_ENCODING_UNICODE` when it is either provided or can be generated
-   *   from PostScript glyph name dictionaries in the font file.  All other
-   *   encodings are considered legacy and tagged only if explicitly defined
-   *   in the font file.  Otherwise, `FT_ENCODING_NONE` is used.
+   *   When loading a font, FreeType makes a Unicode charmap active if
+   *   possible (either if the font provides such a charmap, or if FreeType
+   *   can synthesize one from PostScript glyph name dictionaries; in either
+   *   case, the charmap is tagged with `FT_ENCODING_UNICODE`).  If such a
+   *   charmap is synthesized, it is placed at the first position of the
+   *   charmap array.
+   *
+   *   All other encodings are considered legacy and tagged only if
+   *   explicitly defined in the font file.  Otherwise, `FT_ENCODING_NONE` is
+   *   used.
    *
    *   `FT_ENCODING_NONE` is set by the BDF and PCF drivers if the charmap is
    *   neither Unicode nor ISO-8859-1 (otherwise it is set to
@@ -1222,6 +1237,19 @@ FT_BEGIN_HEADER
    *     altered with @FT_Set_MM_Design_Coordinates,
    *     @FT_Set_Var_Design_Coordinates, or @FT_Set_Var_Blend_Coordinates.
    *     This flag is unset by a call to @FT_Set_Named_Instance.
+   *
+   *   FT_FACE_FLAG_SVG ::
+   *     [Since 2.12] The face has an 'SVG~' OpenType table.
+   *
+   *   FT_FACE_FLAG_SBIX ::
+   *     [Since 2.12] The face has an 'sbix' OpenType table *and* outlines.
+   *     For such fonts, @FT_FACE_FLAG_SCALABLE is not set by default to
+   *     retain backward compatibility.
+   *
+   *   FT_FACE_FLAG_SBIX_OVERLAY ::
+   *     [Since 2.12] The face has an 'sbix' OpenType table where outlines
+   *     should be drawn on top of bitmap strikes.
+   *
    */
 #define FT_FACE_FLAG_SCALABLE          ( 1L <<  0 )
 #define FT_FACE_FLAG_FIXED_SIZES       ( 1L <<  1 )
@@ -1239,6 +1267,9 @@ FT_BEGIN_HEADER
 #define FT_FACE_FLAG_TRICKY            ( 1L << 13 )
 #define FT_FACE_FLAG_COLOR             ( 1L << 14 )
 #define FT_FACE_FLAG_VARIATION         ( 1L << 15 )
+#define FT_FACE_FLAG_SVG               ( 1L << 16 )
+#define FT_FACE_FLAG_SBIX              ( 1L << 17 )
+#define FT_FACE_FLAG_SBIX_OVERLAY      ( 1L << 18 )
 
 
   /**************************************************************************
@@ -1477,6 +1508,124 @@ FT_BEGIN_HEADER
    */
 #define FT_HAS_COLOR( face ) \
           ( !!( (face)->face_flags & FT_FACE_FLAG_COLOR ) )
+
+
+  /**************************************************************************
+   *
+   * @macro:
+   *   FT_HAS_SVG
+   *
+   * @description:
+   *   A macro that returns true whenever a face object contains an 'SVG~'
+   *   OpenType table.
+   *
+   * @since:
+   *   2.12
+   */
+#define FT_HAS_SVG( face ) \
+          ( !!( (face)->face_flags & FT_FACE_FLAG_SVG ) )
+
+
+  /**************************************************************************
+   *
+   * @macro:
+   *   FT_HAS_SBIX
+   *
+   * @description:
+   *   A macro that returns true whenever a face object contains an 'sbix'
+   *   OpenType table *and* outline glyphs.
+   *
+   *   Currently, FreeType only supports bitmap glyphs in PNG format for this
+   *   table (i.e., JPEG and TIFF formats are unsupported, as are
+   *   Apple-specific formats not part of the OpenType specification).
+   *
+   * @note:
+   *   For backward compatibility, a font with an 'sbix' table is treated as
+   *   a bitmap-only face.  Using @FT_Open_Face with
+   *   @FT_PARAM_TAG_IGNORE_SBIX, an application can switch off 'sbix'
+   *   handling so that the face is treated as an ordinary outline font with
+   *   scalable outlines.
+   *
+   *   Here is some pseudo code that roughly illustrates how to implement
+   *   'sbix' handling according to the OpenType specification.
+   *
+   * ```
+   *   if ( FT_HAS_SBIX( face ) )
+   *   {
+   *     // open font as a scalable one without sbix handling
+   *     FT_Face       face2;
+   *     FT_Parameter  param = { FT_PARAM_TAG_IGNORE_SBIX, NULL };
+   *     FT_Open_Args  args  = { FT_OPEN_PARAMS | ...,
+   *                             ...,
+   *                             1, &param };
+   *
+   *
+   *     FT_Open_Face( library, &args, 0, &face2 );
+   *
+   *     <sort `face->available_size` as necessary into
+   *      `preferred_sizes`[*]>
+   *
+   *     for ( i = 0; i < face->num_fixed_sizes; i++ )
+   *     {
+   *       size = preferred_sizes[i].size;
+   *
+   *       error = FT_Set_Pixel_Sizes( face, size, size );
+   *       <error handling omitted>
+   *
+   *       // check whether we have a glyph in a bitmap strike
+   *       error = FT_Load_Glyph( face,
+   *                              glyph_index,
+   *                              FT_LOAD_SBITS_ONLY          |
+   *                              FT_LOAD_BITMAP_METRICS_ONLY );
+   *       if ( error == FT_Err_Invalid_Argument )
+   *         continue;
+   *       else if ( error )
+   *         <other error handling omitted>
+   *       else
+   *         break;
+   *     }
+   *
+   *     if ( i != face->num_fixed_sizes )
+   *       <load embedded bitmap with `FT_Load_Glyph`,
+   *        scale it, display it, etc.>
+   *
+   *     if ( i == face->num_fixed_sizes  ||
+   *          FT_HAS_SBIX_OVERLAY( face ) )
+   *       <use `face2` to load outline glyph with `FT_Load_Glyph`,
+   *        scale it, display it on top of the bitmap, etc.>
+   *   }
+   * ```
+   *
+   * [*] Assuming a target value of 400dpi and available strike sizes 100,
+   * 200, 300, and 400dpi, a possible order might be [400, 200, 300, 100]:
+   * scaling 200dpi to 400dpi usually gives better results than scaling
+   * 300dpi to 400dpi; it is also much faster.  However, scaling 100dpi to
+   * 400dpi can yield a too pixelated result, thus the preference might be
+   * 300dpi over 100dpi.
+   *
+   * @since:
+   *   2.12
+   */
+#define FT_HAS_SBIX( face ) \
+          ( !!( (face)->face_flags & FT_FACE_FLAG_SBIX ) )
+
+
+  /**************************************************************************
+   *
+   * @macro:
+   *   FT_HAS_SBIX_OVERLAY
+   *
+   * @description:
+   *   A macro that returns true whenever a face object contains an 'sbix'
+   *   OpenType table with bit~1 in its `flags` field set, instructing the
+   *   application to overlay the bitmap strike with the corresponding
+   *   outline glyph.  See @FT_HAS_SBIX for pseudo code how to use it.
+   *
+   * @since:
+   *   2.12
+   */
+#define FT_HAS_SBIX_OVERLAY( face ) \
+          ( !!( (face)->face_flags & FT_FACE_FLAG_SBIX_OVERLAY ) )
 
 
   /**************************************************************************
@@ -1743,13 +1892,13 @@ FT_BEGIN_HEADER
    *     The advance width of the unhinted glyph.  Its value is expressed in
    *     16.16 fractional pixels, unless @FT_LOAD_LINEAR_DESIGN is set when
    *     loading the glyph.  This field can be important to perform correct
-   *     WYSIWYG layout.  Only relevant for outline glyphs.
+   *     WYSIWYG layout.  Only relevant for scalable glyphs.
    *
    *   linearVertAdvance ::
    *     The advance height of the unhinted glyph.  Its value is expressed in
    *     16.16 fractional pixels, unless @FT_LOAD_LINEAR_DESIGN is set when
    *     loading the glyph.  This field can be important to perform correct
-   *     WYSIWYG layout.  Only relevant for outline glyphs.
+   *     WYSIWYG layout.  Only relevant for scalable glyphs.
    *
    *   advance ::
    *     This shorthand is, depending on @FT_LOAD_IGNORE_TRANSFORM, the
@@ -2094,7 +2243,8 @@ FT_BEGIN_HEADER
    *     The size in bytes of the file in memory.
    *
    *   pathname ::
-   *     A pointer to an 8-bit file pathname.  The pointer is not owned by
+   *     A pointer to an 8-bit file pathname, which must be a C~string (i.e.,
+   *     no null bytes except at the very end).  The pointer is not owned by
    *     FreeType.
    *
    *   stream ::
@@ -2113,8 +2263,7 @@ FT_BEGIN_HEADER
    *     Extra parameters passed to the font driver when opening a new face.
    *
    * @note:
-   *   The stream type is determined by the contents of `flags` that are
-   *   tested in the following order by @FT_Open_Face:
+   *   The stream type is determined by the contents of `flags`:
    *
    *   If the @FT_OPEN_MEMORY bit is set, assume that this is a memory file
    *   of `memory_size` bytes, located at `memory_address`.  The data are not
@@ -2126,6 +2275,9 @@ FT_BEGIN_HEADER
    *
    *   Otherwise, if the @FT_OPEN_PATHNAME bit is set, assume that this is a
    *   normal file and use `pathname` to open it.
+   *
+   *   If none of the above bits are set or if multiple are set at the same
+   *   time, the flags are invalid and @FT_Open_Face fails.
    *
    *   If the @FT_OPEN_DRIVER bit is set, @FT_Open_Face only tries to open
    *   the file with the driver whose handler is in `driver`.
@@ -2179,6 +2331,13 @@ FT_BEGIN_HEADER
    *   FreeType error code.  0~means success.
    *
    * @note:
+   *   The `pathname` string should be recognizable as such by a standard
+   *   `fopen` call on your system; in particular, this means that `pathname`
+   *   must not contain null bytes.  If that is not sufficient to address all
+   *   file name possibilities (for example, to handle wide character file
+   *   names on Windows in UTF-16 encoding) you might use @FT_Open_Face to
+   *   pass a memory array or a stream object instead.
+   *
    *   Use @FT_Done_Face to destroy the created @FT_Face object (along with
    *   its slot and sizes).
    */
@@ -2298,6 +2457,10 @@ FT_BEGIN_HEADER
    *
    *   See the discussion of reference counters in the description of
    *   @FT_Reference_Face.
+   *
+   *   If `FT_OPEN_STREAM` is set in `args->flags`, the stream in
+   *   `args->stream` is automatically closed before this function returns
+   *   any error (including `FT_Err_Invalid_Argument`).
    *
    * @example:
    *   To loop over all faces, use code similar to the following snippet
@@ -2457,6 +2620,7 @@ FT_BEGIN_HEADER
    *
    * @since:
    *   2.4.2
+   *
    */
   FT_EXPORT( FT_Error )
   FT_Reference_Face( FT_Face  face );
@@ -2681,8 +2845,8 @@ FT_BEGIN_HEADER
    *   'https://www.freetype.org/freetype2/docs/glyphs/glyphs-2.html'.
    *
    *   Contrary to @FT_Set_Char_Size, this function doesn't have special code
-   *   to normalize zero-valued widths, heights, or resolutions (which lead
-   *   to errors in most cases).
+   *   to normalize zero-valued widths, heights, or resolutions, which are
+   *   treated as @FT_LOAD_NO_SCALE.
    *
    *   Don't use this function if you are using the FreeType cache API.
    */
@@ -2798,7 +2962,7 @@ FT_BEGIN_HEADER
    *
    *   load_flags ::
    *     A flag indicating what to load for this glyph.  The @FT_LOAD_XXX
-   *     constants can be used to control the glyph loading process (e.g.,
+   *     flags can be used to control the glyph loading process (e.g.,
    *     whether the outline should be scaled, whether to load bitmaps or
    *     not, whether to hint the outline, etc).
    *
@@ -2806,8 +2970,10 @@ FT_BEGIN_HEADER
    *   FreeType error code.  0~means success.
    *
    * @note:
-   *   The loaded glyph may be transformed.  See @FT_Set_Transform for the
-   *   details.
+   *   For proper scaling and hinting, the active @FT_Size object owned by
+   *   the face has to be meaningfully initialized by calling
+   *   @FT_Set_Char_Size before this function, for example.  The loaded
+   *   glyph may be transformed.  See @FT_Set_Transform for the details.
    *
    *   For subsetted CID-keyed fonts, `FT_Err_Invalid_Argument` is returned
    *   for invalid CID values (this is, for CID values that don't have a
@@ -2897,6 +3063,8 @@ FT_BEGIN_HEADER
    *
    *   FT_LOAD_NO_SCALE ::
    *     Don't scale the loaded outline glyph but keep it in font units.
+   *     This flag is also assumed if @FT_Size owned by the face was not
+   *     properly initialized.
    *
    *     This flag implies @FT_LOAD_NO_HINTING and @FT_LOAD_NO_BITMAP, and
    *     unsets @FT_LOAD_RENDER.
@@ -2926,6 +3094,15 @@ FT_BEGIN_HEADER
    *     flag.
    *
    *     @FT_LOAD_NO_SCALE always sets this flag.
+   *
+   *   FT_LOAD_SBITS_ONLY ::
+   *     [Since 2.12] This is the opposite of @FT_LOAD_NO_BITMAP, more or
+   *     less: @FT_Load_Glyph returns `FT_Err_Invalid_Argument` if the face
+   *     contains a bitmap strike for the given size (or the strike selected
+   *     by @FT_Select_Size) but there is no glyph in the strike.
+   *
+   *     Note that this load flag was part of FreeType since version 2.0.6
+   *     but previously tagged as internal.
    *
    *   FT_LOAD_VERTICAL_LAYOUT ::
    *     Load the glyph for vertical text layout.  In particular, the
@@ -2983,21 +3160,31 @@ FT_BEGIN_HEADER
    *     Disable the auto-hinter.  See also the note below.
    *
    *   FT_LOAD_COLOR ::
-   *     Load colored glyphs.  There are slight differences depending on the
-   *     font format.
+   *     Load colored glyphs.  FreeType searches in the following order;
+   *     there are slight differences depending on the font format.
    *
-   *     [Since 2.5] Load embedded color bitmap images.  The resulting color
-   *     bitmaps, if available, will have the @FT_PIXEL_MODE_BGRA format,
-   *     with pre-multiplied color channels.  If the flag is not set and
-   *     color bitmaps are found, they are converted to 256-level gray
-   *     bitmaps, using the @FT_PIXEL_MODE_GRAY format.
+   *     [Since 2.5] Load embedded color bitmap images (provided
+   *     @FT_LOAD_NO_BITMAP is not set).  The resulting color bitmaps, if
+   *     available, have the @FT_PIXEL_MODE_BGRA format, with pre-multiplied
+   *     color channels.  If the flag is not set and color bitmaps are found,
+   *     they are converted to 256-level gray bitmaps, using the
+   *     @FT_PIXEL_MODE_GRAY format.
    *
-   *     [Since 2.10, experimental] If the glyph index contains an entry in
+   *     [Since 2.12] If the glyph index maps to an entry in the face's
+   *     'SVG~' table, load the associated SVG document from this table and
+   *     set the `format` field of @FT_GlyphSlotRec to @FT_GLYPH_FORMAT_SVG.
+   *     Note that FreeType itself can't render SVG documents; however, the
+   *     library provides hooks to seamlessly integrate an external renderer.
+   *     See sections @ot_svg_driver and @svg_fonts for more.
+   *
+   *     [Since 2.10, experimental] If the glyph index maps to an entry in
    *     the face's 'COLR' table with a 'CPAL' palette table (as defined in
    *     the OpenType specification), make @FT_Render_Glyph provide a default
    *     blending of the color glyph layers associated with the glyph index,
    *     using the same bitmap format as embedded color bitmap images.  This
-   *     is mainly for convenience; for full control of color layers use
+   *     is mainly for convenience and works only for glyphs in 'COLR' v0
+   *     tables (or glyphs in 'COLR' v1 tables that exclusively use v0
+   *     features).  For full control of color layers use
    *     @FT_Get_Color_Glyph_Layer and FreeType's color functions like
    *     @FT_Palette_Select instead of setting @FT_LOAD_COLOR for rendering
    *     so that the client application can handle blending by itself.
@@ -3048,19 +3235,20 @@ FT_BEGIN_HEADER
    *
    */
 #define FT_LOAD_DEFAULT                      0x0
-#define FT_LOAD_NO_SCALE                     ( 1L << 0 )
-#define FT_LOAD_NO_HINTING                   ( 1L << 1 )
-#define FT_LOAD_RENDER                       ( 1L << 2 )
-#define FT_LOAD_NO_BITMAP                    ( 1L << 3 )
-#define FT_LOAD_VERTICAL_LAYOUT              ( 1L << 4 )
-#define FT_LOAD_FORCE_AUTOHINT               ( 1L << 5 )
-#define FT_LOAD_CROP_BITMAP                  ( 1L << 6 )
-#define FT_LOAD_PEDANTIC                     ( 1L << 7 )
-#define FT_LOAD_IGNORE_GLOBAL_ADVANCE_WIDTH  ( 1L << 9 )
+#define FT_LOAD_NO_SCALE                     ( 1L << 0  )
+#define FT_LOAD_NO_HINTING                   ( 1L << 1  )
+#define FT_LOAD_RENDER                       ( 1L << 2  )
+#define FT_LOAD_NO_BITMAP                    ( 1L << 3  )
+#define FT_LOAD_VERTICAL_LAYOUT              ( 1L << 4  )
+#define FT_LOAD_FORCE_AUTOHINT               ( 1L << 5  )
+#define FT_LOAD_CROP_BITMAP                  ( 1L << 6  )
+#define FT_LOAD_PEDANTIC                     ( 1L << 7  )
+#define FT_LOAD_IGNORE_GLOBAL_ADVANCE_WIDTH  ( 1L << 9  )
 #define FT_LOAD_NO_RECURSE                   ( 1L << 10 )
 #define FT_LOAD_IGNORE_TRANSFORM             ( 1L << 11 )
 #define FT_LOAD_MONOCHROME                   ( 1L << 12 )
 #define FT_LOAD_LINEAR_DESIGN                ( 1L << 13 )
+#define FT_LOAD_SBITS_ONLY                   ( 1L << 14 )
 #define FT_LOAD_NO_AUTOHINT                  ( 1L << 15 )
   /* Bits 16-19 are used by `FT_LOAD_TARGET_` */
 #define FT_LOAD_COLOR                        ( 1L << 20 )
@@ -3070,8 +3258,8 @@ FT_BEGIN_HEADER
   /* */
 
   /* used internally only by certain font drivers */
-#define FT_LOAD_ADVANCE_ONLY                 ( 1L << 8 )
-#define FT_LOAD_SBITS_ONLY                   ( 1L << 14 )
+#define FT_LOAD_ADVANCE_ONLY                 ( 1L << 8  )
+#define FT_LOAD_SVG_ONLY                     ( 1L << 23 )
 
 
   /**************************************************************************
@@ -3161,7 +3349,7 @@ FT_BEGIN_HEADER
    *   necessary to empty the cache after a mode switch to avoid false hits.
    *
    */
-#define FT_LOAD_TARGET_( x )   ( (FT_Int32)( (x) & 15 ) << 16 )
+#define FT_LOAD_TARGET_( x )   ( FT_STATIC_CAST( FT_Int32, (x) & 15 ) << 16 )
 
 #define FT_LOAD_TARGET_NORMAL  FT_LOAD_TARGET_( FT_RENDER_MODE_NORMAL )
 #define FT_LOAD_TARGET_LIGHT   FT_LOAD_TARGET_( FT_RENDER_MODE_LIGHT  )
@@ -3180,7 +3368,8 @@ FT_BEGIN_HEADER
    *   @FT_LOAD_TARGET_XXX value.
    *
    */
-#define FT_LOAD_TARGET_MODE( x )  ( (FT_Render_Mode)( ( (x) >> 16 ) & 15 ) )
+#define FT_LOAD_TARGET_MODE( x )                               \
+          FT_STATIC_CAST( FT_Render_Mode, ( (x) >> 16 ) & 15 )
 
 
   /**************************************************************************
@@ -3247,6 +3436,10 @@ FT_BEGIN_HEADER
    *   delta ::
    *     A pointer a translation vector.  Set this to NULL if you are not
    *     interested in the value.
+   *
+   * @since:
+   *   2.11
+   *
    */
   FT_EXPORT( void )
   FT_Get_Transform( FT_Face     face,
@@ -3267,14 +3460,14 @@ FT_BEGIN_HEADER
    *   in the @FT_GlyphSlotRec structure gives the format of the returned
    *   bitmap.
    *
-   *   All modes except @FT_RENDER_MODE_MONO and @FT_RENDER_MODE_SDF use 256
-   *   levels of opacity, indicating pixel coverage.  Use linear alpha
-   *   blending and gamma correction to correctly render non-monochrome
-   *   glyph bitmaps onto a surface; see @FT_Render_Glyph.
+   *   All modes except @FT_RENDER_MODE_MONO use 256 levels of opacity,
+   *   indicating pixel coverage.  Use linear alpha blending and gamma
+   *   correction to correctly render non-monochrome glyph bitmaps onto a
+   *   surface; see @FT_Render_Glyph.
    *
-   *   The @FT_RENDER_MODE_SDF is a special render mode that uses up to
-   *   65536 distance values, indicating the signed distance from the grid
-   *   position to the nearest outline.
+   *   The @FT_RENDER_MODE_SDF is a special render mode that uses up to 256
+   *   distance values, indicating the signed distance from the grid position
+   *   to the nearest outline.
    *
    * @values:
    *   FT_RENDER_MODE_NORMAL ::
@@ -3302,19 +3495,86 @@ FT_BEGIN_HEADER
    *     pixels and use the @FT_PIXEL_MODE_LCD_V mode.
    *
    *   FT_RENDER_MODE_SDF ::
-   *     This mode corresponds to 16-bit signed distance fields (SDF)
-   *     bitmaps.  Each pixel in a SDF bitmap contains information about the
-   *     nearest edge of the glyph outline.  The distances are calculated
-   *     from the center of the pixel and are positive if they are filled by
-   *     the outline (i.e., inside the outline) and negative otherwise.  The
-   *     output bitmap buffer is represented as 6.10 fixed-point values; use
-   *     @FT_F6Dot10 and convert accordingly.
+   *     This mode corresponds to 8-bit, single-channel signed distance field
+   *     (SDF) bitmaps.  Each pixel in the SDF grid is the value from the
+   *     pixel's position to the nearest glyph's outline.  The distances are
+   *     calculated from the center of the pixel and are positive if they are
+   *     filled by the outline (i.e., inside the outline) and negative
+   *     otherwise.  Check the note below on how to convert the output values
+   *     to usable data.
    *
    * @note:
    *   The selected render mode only affects vector glyphs of a font.
    *   Embedded bitmaps often have a different pixel mode like
    *   @FT_PIXEL_MODE_MONO.  You can use @FT_Bitmap_Convert to transform them
    *   into 8-bit pixmaps.
+   *
+   *   For @FT_RENDER_MODE_SDF the output bitmap buffer contains normalized
+   *   distances that are packed into unsigned 8-bit values.  To get pixel
+   *   values in floating point representation use the following pseudo-C
+   *   code for the conversion.
+   *
+   *   ```
+   *   // Load glyph and render using FT_RENDER_MODE_SDF,
+   *   // then use the output buffer as follows.
+   *
+   *   ...
+   *   FT_Byte  buffer = glyph->bitmap->buffer;
+   *
+   *
+   *   for pixel in buffer
+   *   {
+   *     // `sd` is the signed distance and `spread` is the current spread;
+   *     // the default spread is 2 and can be changed.
+   *
+   *     float  sd = (float)pixel - 128.0f;
+   *
+   *
+   *     // Convert to pixel values.
+   *     sd = ( sd / 128.0f ) * spread;
+   *
+   *     // Store `sd` in a buffer or use as required.
+   *   }
+   *
+   *   ```
+   *
+   *   FreeType has two rasterizers for generating SDF, namely:
+   *
+   *   1. `sdf` for generating SDF directly from glyph's outline, and
+   *
+   *   2. `bsdf` for generating SDF from rasterized bitmaps.
+   *
+   *   Depending on the glyph type (i.e., outline or bitmap), one of the two
+   *   rasterizers is chosen at runtime and used for generating SDFs.  To
+   *   force the use of `bsdf` you should render the glyph with any of the
+   *   FreeType's other rendering modes (e.g., `FT_RENDER_MODE_NORMAL`) and
+   *   then re-render with `FT_RENDER_MODE_SDF`.
+   *
+   *   There are some issues with stability and possible failures of the SDF
+   *   renderers (specifically `sdf`).
+   *
+   *   1. The `sdf` rasterizer is sensitive to really small features (e.g.,
+   *      sharp turns that are less than 1~pixel) and imperfections in the
+   *      glyph's outline, causing artifacts in the final output.
+   *
+   *   2. The `sdf` rasterizer has limited support for handling intersecting
+   *      contours and *cannot* handle self-intersecting contours whatsoever.
+   *      Self-intersection happens when a single connected contour intersect
+   *      itself at some point; having these in your font definitely pose a
+   *      problem to the rasterizer and cause artifacts, too.
+   *
+   *   3. Generating SDF for really small glyphs may result in undesirable
+   *      output; the pixel grid (which stores distance information) becomes
+   *      too coarse.
+   *
+   *   4. Since the output buffer is normalized, precision at smaller spreads
+   *      is greater than precision at larger spread values because the
+   *      output range of [0..255] gets mapped to a smaller SDF range.  A
+   *      spread of~2 should be sufficient in most cases.
+   *
+   *   Points (1) and (2) can be avoided by using the `bsdf` rasterizer,
+   *   which is more stable than the `sdf` rasterizer in general.
+   *
    */
   typedef enum  FT_Render_Mode_
   {
@@ -3355,7 +3615,7 @@ FT_BEGIN_HEADER
    *     @FT_Render_Mode for a list of possible values.
    *
    *     If @FT_RENDER_MODE_NORMAL is used, a previous call of @FT_Load_Glyph
-   *     with flag @FT_LOAD_COLOR makes FT_Render_Glyph provide a default
+   *     with flag @FT_LOAD_COLOR makes `FT_Render_Glyph` provide a default
    *     blending of colored glyph layers associated with the current glyph
    *     slot (provided the font contains such layers) instead of rendering
    *     the glyph slot's outline.  This is an experimental feature; see
@@ -3365,9 +3625,6 @@ FT_BEGIN_HEADER
    *   FreeType error code.  0~means success.
    *
    * @note:
-   *   To get meaningful results, font scaling values must be set with
-   *   functions like @FT_Set_Char_Size before calling `FT_Render_Glyph`.
-   *
    *   When FreeType outputs a bitmap of a glyph, it really outputs an alpha
    *   coverage map.  If a pixel is completely covered by a filled-in
    *   outline, the bitmap contains 0xFF at that pixel, meaning that
@@ -3411,7 +3668,8 @@ FT_BEGIN_HEADER
    *
    *   which is known as the OVER operator.
    *
-   *   To correctly composite an antialiased pixel of a glyph onto a surface,
+   *   To correctly composite an anti-aliased pixel of a glyph onto a
+   *   surface,
    *
    *   1. take the foreground and background colors (e.g., in sRGB space)
    *      and apply gamma to get them in a linear space,
@@ -4091,1112 +4349,6 @@ FT_BEGIN_HEADER
   /**************************************************************************
    *
    * @section:
-   *   layer_management
-   *
-   * @title:
-   *   Glyph Layer Management
-   *
-   * @abstract:
-   *   Retrieving and manipulating OpenType's 'COLR' table data.
-   *
-   * @description:
-   *   The functions described here allow access of colored glyph layer data
-   *   in OpenType's 'COLR' tables.
-   */
-
-
-  /**************************************************************************
-   *
-   * @struct:
-   *   FT_LayerIterator
-   *
-   * @description:
-   *   This iterator object is needed for @FT_Get_Color_Glyph_Layer.
-   *
-   * @fields:
-   *   num_layers ::
-   *     The number of glyph layers for the requested glyph index.  Will be
-   *     set by @FT_Get_Color_Glyph_Layer.
-   *
-   *   layer ::
-   *     The current layer.  Will be set by @FT_Get_Color_Glyph_Layer.
-   *
-   *   p ::
-   *     An opaque pointer into 'COLR' table data.  The caller must set this
-   *     to `NULL` before the first call of @FT_Get_Color_Glyph_Layer.
-   */
-  typedef struct  FT_LayerIterator_
-  {
-    FT_UInt   num_layers;
-    FT_UInt   layer;
-    FT_Byte*  p;
-
-  } FT_LayerIterator;
-
-
-  /**************************************************************************
-   *
-   * @function:
-   *   FT_Get_Color_Glyph_Layer
-   *
-   * @description:
-   *   This is an interface to the 'COLR' table in OpenType fonts to
-   *   iteratively retrieve the colored glyph layers associated with the
-   *   current glyph slot.
-   *
-   *     https://docs.microsoft.com/en-us/typography/opentype/spec/colr
-   *
-   *   The glyph layer data for a given glyph index, if present, provides an
-   *   alternative, multi-color glyph representation: Instead of rendering
-   *   the outline or bitmap with the given glyph index, glyphs with the
-   *   indices and colors returned by this function are rendered layer by
-   *   layer.
-   *
-   *   The returned elements are ordered in the z~direction from bottom to
-   *   top; the 'n'th element should be rendered with the associated palette
-   *   color and blended on top of the already rendered layers (elements 0,
-   *   1, ..., n-1).
-   *
-   * @input:
-   *   face ::
-   *     A handle to the parent face object.
-   *
-   *   base_glyph ::
-   *     The glyph index the colored glyph layers are associated with.
-   *
-   * @inout:
-   *   iterator ::
-   *     An @FT_LayerIterator object.  For the first call you should set
-   *     `iterator->p` to `NULL`.  For all following calls, simply use the
-   *     same object again.
-   *
-   * @output:
-   *   aglyph_index ::
-   *     The glyph index of the current layer.
-   *
-   *   acolor_index ::
-   *     The color index into the font face's color palette of the current
-   *     layer.  The value 0xFFFF is special; it doesn't reference a palette
-   *     entry but indicates that the text foreground color should be used
-   *     instead (to be set up by the application outside of FreeType).
-   *
-   *     The color palette can be retrieved with @FT_Palette_Select.
-   *
-   * @return:
-   *   Value~1 if everything is OK.  If there are no more layers (or if there
-   *   are no layers at all), value~0 gets returned.  In case of an error,
-   *   value~0 is returned also.
-   *
-   * @note:
-   *   This function is necessary if you want to handle glyph layers by
-   *   yourself.  In particular, functions that operate with @FT_GlyphRec
-   *   objects (like @FT_Get_Glyph or @FT_Glyph_To_Bitmap) don't have access
-   *   to this information.
-   *
-   *   Note that @FT_Render_Glyph is able to handle colored glyph layers
-   *   automatically if the @FT_LOAD_COLOR flag is passed to a previous call
-   *   to @FT_Load_Glyph.  [This is an experimental feature.]
-   *
-   * @example:
-   *   ```
-   *     FT_Color*         palette;
-   *     FT_LayerIterator  iterator;
-   *
-   *     FT_Bool  have_layers;
-   *     FT_UInt  layer_glyph_index;
-   *     FT_UInt  layer_color_index;
-   *
-   *
-   *     error = FT_Palette_Select( face, palette_index, &palette );
-   *     if ( error )
-   *       palette = NULL;
-   *
-   *     iterator.p  = NULL;
-   *     have_layers = FT_Get_Color_Glyph_Layer( face,
-   *                                             glyph_index,
-   *                                             &layer_glyph_index,
-   *                                             &layer_color_index,
-   *                                             &iterator );
-   *
-   *     if ( palette && have_layers )
-   *     {
-   *       do
-   *       {
-   *         FT_Color  layer_color;
-   *
-   *
-   *         if ( layer_color_index == 0xFFFF )
-   *           layer_color = text_foreground_color;
-   *         else
-   *           layer_color = palette[layer_color_index];
-   *
-   *         // Load and render glyph `layer_glyph_index', then
-   *         // blend resulting pixmap (using color `layer_color')
-   *         // with previously created pixmaps.
-   *
-   *       } while ( FT_Get_Color_Glyph_Layer( face,
-   *                                           glyph_index,
-   *                                           &layer_glyph_index,
-   *                                           &layer_color_index,
-   *                                           &iterator ) );
-   *     }
-   *   ```
-   */
-  FT_EXPORT( FT_Bool )
-  FT_Get_Color_Glyph_Layer( FT_Face            face,
-                            FT_UInt            base_glyph,
-                            FT_UInt           *aglyph_index,
-                            FT_UInt           *acolor_index,
-                            FT_LayerIterator*  iterator );
-
-
-  /**************************************************************************
-   *
-   * @enum:
-   *   FT_PaintFormat
-   *
-   * @description:
-   *   Enumeration describing the different paint format types of the v1
-   *   extensions to the 'COLR' table, see
-   *   'https://github.com/googlefonts/colr-gradients-spec'.
-   *
-   *   Only non-variable format identifiers are listed in this enumeration;
-   *   as soon as support for variable 'COLR' v1 fonts is implemented,
-   *   interpolation is performed dependent on axis coordinates, which are
-   *   configured on the @FT_Face through @FT_Set_Var_Design_Coordinates.
-   *   This implies that always static (interpolated) values are returned
-   *   for both variable and non-variable formats.
-   */
-  typedef enum  FT_PaintFormat_
-  {
-    FT_COLR_PAINTFORMAT_COLR_LAYERS     = 1,
-    FT_COLR_PAINTFORMAT_SOLID           = 2,
-    FT_COLR_PAINTFORMAT_LINEAR_GRADIENT = 4,
-    FT_COLR_PAINTFORMAT_RADIAL_GRADIENT = 6,
-    FT_COLR_PAINTFORMAT_SWEEP_GRADIENT  = 8,
-    FT_COLR_PAINTFORMAT_GLYPH           = 10,
-    FT_COLR_PAINTFORMAT_COLR_GLYPH      = 11,
-    FT_COLR_PAINTFORMAT_TRANSFORMED     = 12,
-    FT_COLR_PAINTFORMAT_TRANSLATE       = 14,
-    FT_COLR_PAINTFORMAT_ROTATE          = 16,
-    FT_COLR_PAINTFORMAT_SKEW            = 18,
-    FT_COLR_PAINTFORMAT_COMPOSITE       = 20,
-    FT_COLR_PAINT_FORMAT_MAX            = 21,
-    FT_COLR_PAINTFORMAT_UNSUPPORTED     = 255
-
-  } FT_PaintFormat;
-
-
-  /**************************************************************************
-   *
-   * @struct:
-   *   FT_ColorStopIterator
-   *
-   * @description:
-   *   This iterator object is needed for @FT_Get_Colorline_Stops.  It keeps
-   *   state while iterating over the stops of an @FT_ColorLine,
-   *   representing the `ColorLine` struct of the v1 extensions to 'COLR',
-   *   see 'https://github.com/googlefonts/colr-gradients-spec'.
-   *
-   * @fields:
-   *   num_color_stops ::
-   *     The number of color stops for the requested glyph index.  Set by
-   *     @FT_Get_Colorline_Stops.
-   *
-   *   current_color_stop ::
-   *     The current color stop.  Set by @FT_Get_Colorline_Stops.
-   *
-   *   p ::
-   *     An opaque pointer into 'COLR' table data.  The caller must set this
-   *     to `NULL` before the first call of @FT_Get_Colorline_Stops.
-   */
-  typedef struct  FT_ColorStopIterator_
-  {
-    FT_UInt  num_color_stops;
-    FT_UInt  current_color_stop;
-
-    FT_Byte*  p;
-
-  } FT_ColorStopIterator;
-
-
-  /**************************************************************************
-   *
-   * @struct:
-   *   FT_ColorIndex
-   *
-   * @description:
-   *   A structure representing a `ColorIndex` value of the 'COLR' v1
-   *   extensions, see 'https://github.com/googlefonts/colr-gradients-spec'.
-   *
-   * @fields:
-   *   palette_index ::
-   *     The palette index into a 'CPAL' palette.
-   *
-   *   alpha ::
-   *     Alpha transparency value multiplied with the value from 'CPAL'.
-   */
-  typedef struct  FT_ColorIndex_
-  {
-    FT_UInt16   palette_index;
-    FT_F2Dot14  alpha;
-
-  } FT_ColorIndex;
-
-
-  /**************************************************************************
-   *
-   * @struct:
-   *   FT_ColorStop
-   *
-   * @description:
-   *   A structure representing a `ColorStop` value of the 'COLR' v1
-   *   extensions, see 'https://github.com/googlefonts/colr-gradients-spec'.
-   *
-   * @fields:
-   *   stop_offset ::
-   *     The stop offset between 0 and 1 along the gradient.
-   *
-   *   color ::
-   *     The color information for this stop, see @FT_ColorIndex.
-   */
-  typedef struct  FT_ColorStop_
-  {
-    FT_F2Dot14     stop_offset;
-    FT_ColorIndex  color;
-
-  } FT_ColorStop;
-
-
-  /**************************************************************************
-   *
-   * @enum:
-   *   FT_PaintExtend
-   *
-   * @description:
-   *   An enumeration representing the 'Extend' mode of the 'COLR' v1
-   *   extensions, see 'https://github.com/googlefonts/colr-gradients-spec'.
-   *   It describes how the gradient fill continues at the other boundaries.
-   */
-  typedef enum  FT_PaintExtend_
-  {
-    FT_COLR_PAINT_EXTEND_PAD     = 0,
-    FT_COLR_PAINT_EXTEND_REPEAT  = 1,
-    FT_COLR_PAINT_EXTEND_REFLECT = 2
-
-  } FT_PaintExtend;
-
-
-  /**************************************************************************
-   *
-   * @struct:
-   *   FT_ColorLine
-   *
-   * @description:
-   *   A structure representing a `ColorLine` value of the 'COLR' v1
-   *   extensions, see 'https://github.com/googlefonts/colr-gradients-spec'.
-   *   It describes a list of color stops along the defined gradient.
-   *
-   * @fields:
-   *   extend ::
-   *     The extend mode at the outer boundaries, see @FT_PaintExtend.
-   *
-   *   color_stop_iterator ::
-   *     The @FT_ColorStopIterator used to enumerate and retrieve the
-   *     actual @FT_ColorStop's.
-   */
-  typedef struct  FT_ColorLine_
-  {
-    FT_PaintExtend        extend;
-    FT_ColorStopIterator  color_stop_iterator;
-
-  } FT_ColorLine;
-
-
-  /**************************************************************************
-   *
-   * @struct:
-   *   FT_Affine23
-   *
-   * @description:
-   *   A structure used to store a 2x3 matrix.  Coefficients are in
-   *   16.16 fixed-point format.  The computation performed is
-   *
-   *   ```
-   *     x' = x*xx + y*xy + dx
-   *     y' = x*yx + y*yy + dy
-   *   ```
-   *
-   * @fields:
-   *   xx ::
-   *     Matrix coefficient.
-   *
-   *   xy ::
-   *     Matrix coefficient.
-   *
-   *   dx ::
-   *     x translation.
-   *
-   *   yx ::
-   *     Matrix coefficient.
-   *
-   *   yy ::
-   *     Matrix coefficient.
-   *
-   *   dy ::
-   *     y translation.
-   *
-   */
-  typedef struct  FT_Affine_23_
-  {
-    FT_Fixed  xx, xy, dx;
-    FT_Fixed  yx, yy, dy;
-
-  } FT_Affine23;
-
-
-  /**************************************************************************
-   *
-   * @enum:
-   *   FT_Composite_Mode
-   *
-   * @description:
-   *   An enumeration listing the 'COLR' v1 composite modes used in
-   *   @FT_PaintComposite.  For more details on each paint mode, see
-   *   'https://www.w3.org/TR/compositing-1/#porterduffcompositingoperators'.
-   */
-  typedef enum  FT_Composite_Mode_
-  {
-    FT_COLR_COMPOSITE_CLEAR          = 0,
-    FT_COLR_COMPOSITE_SRC            = 1,
-    FT_COLR_COMPOSITE_DEST           = 2,
-    FT_COLR_COMPOSITE_SRC_OVER       = 3,
-    FT_COLR_COMPOSITE_DEST_OVER      = 4,
-    FT_COLR_COMPOSITE_SRC_IN         = 5,
-    FT_COLR_COMPOSITE_DEST_IN        = 6,
-    FT_COLR_COMPOSITE_SRC_OUT        = 7,
-    FT_COLR_COMPOSITE_DEST_OUT       = 8,
-    FT_COLR_COMPOSITE_SRC_ATOP       = 9,
-    FT_COLR_COMPOSITE_DEST_ATOP      = 10,
-    FT_COLR_COMPOSITE_XOR            = 11,
-    FT_COLR_COMPOSITE_SCREEN         = 12,
-    FT_COLR_COMPOSITE_OVERLAY        = 13,
-    FT_COLR_COMPOSITE_DARKEN         = 14,
-    FT_COLR_COMPOSITE_LIGHTEN        = 15,
-    FT_COLR_COMPOSITE_COLOR_DODGE    = 16,
-    FT_COLR_COMPOSITE_COLOR_BURN     = 17,
-    FT_COLR_COMPOSITE_HARD_LIGHT     = 18,
-    FT_COLR_COMPOSITE_SOFT_LIGHT     = 19,
-    FT_COLR_COMPOSITE_DIFFERENCE     = 20,
-    FT_COLR_COMPOSITE_EXCLUSION      = 21,
-    FT_COLR_COMPOSITE_MULTIPLY       = 22,
-    FT_COLR_COMPOSITE_HSL_HUE        = 23,
-    FT_COLR_COMPOSITE_HSL_SATURATION = 24,
-    FT_COLR_COMPOSITE_HSL_COLOR      = 25,
-    FT_COLR_COMPOSITE_HSL_LUMINOSITY = 26,
-    FT_COLR_COMPOSITE_MAX            = 27
-
-  } FT_Composite_Mode;
-
-
-  /**************************************************************************
-   *
-   * @struct:
-   *   FT_OpaquePaint
-   *
-   * @description:
-   *   A structure representing an offset to a `Paint` value stored in any
-   *   of the paint tables of a 'COLR' v1 font.  Compare Offset<24> there.
-   *   When 'COLR' v1 paint tables represented by FreeType objects such as
-   *   @FT_PaintColrLayers, @FT_PaintComposite, or @FT_PaintTransformed
-   *   reference downstream nested paint tables, we do not immediately
-   *   retrieve them but encapsulate their location in this type.  Use
-   *   @FT_Get_Paint to retrieve the actual @FT_COLR_Paint object that
-   *   describes the details of the respective paint table.
-   *
-   * @fields:
-   *   p ::
-   *     An internal offset to a Paint table, needs to be set to NULL before
-   *     passing this struct as an argument to @FT_Get_Paint.
-   *
-   *   insert_root_transform ::
-   *     An internal boolean to track whether an initial root transform is
-   *     to be provided.  Do not set this value.
-   */
-  typedef struct  FT_Opaque_Paint_
-  {
-    FT_Byte*  p;
-    FT_Bool   insert_root_transform;
-  } FT_OpaquePaint;
-
-
-  /**************************************************************************
-   *
-   * @struct:
-   *   FT_PaintColrLayers
-   *
-   * @description:
-   *   A structure representing a `PaintColrLayers` table of a 'COLR' v1
-   *   font.  This table describes a set of layers that are to be composited
-   *   with composite mode `FT_COLR_COMPOSITE_SRC_OVER`.  The return value
-   *   of this function is an @FT_LayerIterator initialized so that it can
-   *   be used with @FT_Get_Paint_Layers to retrieve the @FT_OpaquePaint
-   *   objects as references to each layer.
-   *
-   * @fields:
-   *   layer_iterator ::
-   *     The layer iterator that describes the layers of this paint.
-   */
-  typedef struct  FT_PaintColrLayers_
-  {
-    FT_LayerIterator  layer_iterator;
-
-  } FT_PaintColrLayers;
-
-
-  /**************************************************************************
-   *
-   * @struct:
-   *   FT_PaintSolid
-   *
-   * @description:
-   *   A structure representing a `PaintSolid` value of the 'COLR' v1
-   *   extensions, see 'https://github.com/googlefonts/colr-gradients-spec'.
-   *   Using a `PaintSolid` value means that the glyph layer filled with
-   *   this paint is solid-colored and does not contain a gradient.
-   *
-   * @fields:
-   *   color ::
-   *     The color information for this solid paint, see @FT_ColorIndex.
-   */
-  typedef struct  FT_PaintSolid_
-  {
-    FT_ColorIndex  color;
-
-  } FT_PaintSolid;
-
-
-  /**************************************************************************
-   *
-   * @struct:
-   *   FT_PaintLinearGradient
-   *
-   * @description:
-   *   A structure representing a `PaintLinearGradient` value of the 'COLR'
-   *   v1 extensions, see
-   *   'https://github.com/googlefonts/colr-gradients-spec'.  The glyph
-   *   layer filled with this paint is drawn filled with a linear gradient.
-   *
-   * @fields:
-   *   colorline ::
-   *     The @FT_ColorLine information for this paint, i.e., the list of
-   *     color stops along the gradient.
-   *
-   *   p0 ::
-   *     The starting point of the gradient definition (in font units).
-   *
-   *   p1 ::
-   *     The end point of the gradient definition (in font units).
-   *
-   *   p2 ::
-   *     Optional point~p2 to rotate the gradient (in font units).
-   *     Otherwise equal to~p0.
-   */
-  typedef struct  FT_PaintLinearGradient_
-  {
-    FT_ColorLine  colorline;
-
-    /* TODO: Potentially expose those as x0, y0 etc. */
-    FT_Vector  p0;
-    FT_Vector  p1;
-    FT_Vector  p2;
-
-  } FT_PaintLinearGradient;
-
-
-  /**************************************************************************
-   *
-   * @struct:
-   *   FT_PaintRadialGradient
-   *
-   * @description:
-   *   A structure representing a `PaintRadialGradient` value of the 'COLR'
-   *   v1 extensions, see
-   *   'https://github.com/googlefonts/colr-gradients-spec'.  The glyph
-   *   layer filled with this paint is drawn filled filled with a radial
-   *   gradient.
-   *
-   * @fields:
-   *   colorline ::
-   *     The @FT_ColorLine information for this paint, i.e., the list of
-   *     color stops along the gradient.
-   *
-   *   c0 ::
-   *     The center of the starting point of the radial gradient (in font
-   *     units).
-   *
-   *   r0 ::
-   *     The radius of the starting circle of the radial gradient (in font
-   *     units).
-   *
-   *   c1 ::
-   *     The center of the end point of the radial gradient (in font units).
-   *
-   *   r1 ::
-   *     The radius of the end circle of the radial gradient (in font
-   *     units).
-   */
-  typedef struct  FT_PaintRadialGradient_
-  {
-    FT_ColorLine  colorline;
-
-    FT_Vector  c0;
-    FT_UShort  r0;
-    FT_Vector  c1;
-    FT_UShort  r1;
-
-  } FT_PaintRadialGradient;
-
-
-  /**************************************************************************
-   *
-   * @struct:
-   *   FT_PaintSweepGradient
-   *
-   * @description:
-   *   A structure representing a `PaintSweepGradient` value of the 'COLR'
-   *   v1 extensions, see
-   *   'https://github.com/googlefonts/colr-gradients-spec'.  The glyph
-   *   layer filled with this paint is drawn filled with a sweep gradient
-   *   from `start_angle` to `end_angle`.
-   *
-   * @fields:
-   *   colorline ::
-   *     The @FT_ColorLine information for this paint, i.e., the list of
-   *     color stops along the gradient.
-   *
-   *   center ::
-   *     The center of the sweep gradient (in font units).
-   *
-   *   start_angle ::
-   *     The start angle of the sweep gradient, in 16.16 fixed point format
-   *     specifying degrees.  Values are given counter-clockwise, starting
-   *     from the (positive) y~axis.
-   *
-   *   end_angle ::
-   *     The end angle of the sweep gradient, in 16.16 fixed point format
-   *     specifying degrees.  Values are given counter-clockwise, starting
-   *     from the (positive) y~axis.
-   *
-   */
-  typedef struct  FT_PaintSweepGradient_
-  {
-    FT_ColorLine  colorline;
-
-    FT_Vector  center;
-    FT_Fixed   start_angle;
-    FT_Fixed   end_angle;
-
-  } FT_PaintSweepGradient;
-
-
-  /**************************************************************************
-   *
-   * @struct:
-   *   FT_PaintGlyph
-   *
-   * @description:
-   *   A structure representing a 'COLR' v1 `PaintGlyph` paint table.
-   *
-   * @fields:
-   *   paint ::
-   *     An opaque paint object pointing to a `Paint` table that serves as
-   *     the fill for the glyph ID.
-   *
-   *   glyphID ::
-   *     The glyph ID from the 'glyf' table, which serves as the contour
-   *     information that is filled with paint.
-   *
-   */
-  typedef struct  FT_PaintGlyph_
-  {
-    FT_OpaquePaint  paint;
-    FT_UInt         glyphID;
-
-  } FT_PaintGlyph;
-
-
-  /**************************************************************************
-   *
-   * @struct:
-   *   FT_PaintColrGlyph
-   *
-   * @description:
-   *   A structure representing a 'COLR' v1 `PaintColorGlyph` paint table.
-   *
-   * @fields:
-   *   glyphID ::
-   *     The glyph ID from the `BaseGlyphV1List` table that is drawn for
-   *     this paint.
-   */
-  typedef struct  FT_PaintColrGlyph_
-  {
-    FT_UInt  glyphID;
-
-  } FT_PaintColrGlyph;
-
-
-  /**************************************************************************
-   *
-   * @struct:
-   *   FT_PaintTransformed
-   *
-   * @description:
-   *   A structure representing a 'COLR' v1 `PaintTransformed` paint table.
-   *
-   * @fields:
-   *   paint ::
-   *     An opaque paint that is subject to being transformed.
-   *
-   *   affine ::
-   *     A 2x3 transformation matrix in @FT_Affine23 format.
-   */
-  typedef struct  FT_PaintTransformed_
-  {
-    FT_OpaquePaint  paint;
-    FT_Affine23     affine;
-
-  } FT_PaintTransformed;
-
-
-  /**************************************************************************
-   *
-   * @struct:
-   *   FT_PaintTranslate
-   *
-   * @description:
-   *   A structure representing a 'COLR' v1 `PaintTranslate` paint table.
-   *   Used for translating downstream paints by a given x and y~delta.
-   *
-   * @fields:
-   *   paint ::
-   *     An @FT_OpaquePaint object referencing the paint that is to be
-   *     rotated.
-   *
-   *   dx ::
-   *     Translation in x~direction (in font units).
-   *
-   *   dy ::
-   *     Translation in y~direction (in font units).
-   */
-  typedef struct  FT_PaintTranslate_
-  {
-    FT_OpaquePaint  paint;
-
-    FT_Fixed  dx;
-    FT_Fixed  dy;
-
-  } FT_PaintTranslate;
-
-
-  /**************************************************************************
-   *
-   * @struct:
-   *   FT_PaintRotate
-   *
-   * @description:
-   *   A structure representing a 'COLR' v1 `PaintRotate` paint table.  Used
-   *   for rotating downstream paints with a given center and angle.
-   *
-   * @fields:
-   *   paint ::
-   *     An @FT_OpaquePaint object referencing the paint that is to be
-   *     rotated.
-   *
-   *   angle ::
-   *     The rotation angle that is to be applied.
-   *
-   *   center_x ::
-   *     The x~coordinate of the pivot point of the rotation (in font
-   *     units).
-   *
-   *   center_y ::
-   *     The y~coordinate of the pivot point of the rotation (in font
-   *     units).
-   */
-
-  typedef struct  FT_PaintRotate_
-  {
-    FT_OpaquePaint  paint;
-
-    FT_Fixed  angle;
-
-    FT_Fixed  center_x;
-    FT_Fixed  center_y;
-
-  } FT_PaintRotate;
-
-
-  /**************************************************************************
-   *
-   * @struct:
-   *   FT_PaintSkew
-   *
-   * @description:
-   *   A structure representing a 'COLR' v1 `PaintSkew` paint table.  Used
-   *   for skewing or shearing downstream paints by a given center and
-   *   angle.
-   *
-   * @fields:
-   *   paint ::
-   *     An @FT_OpaquePaint object referencing the paint that is to be
-   *     skewed.
-   *
-   *   x_skew_angle ::
-   *     The skewing angle in x~direction.
-   *
-   *   y_skew_angle ::
-   *     The skewing angle in y~direction.
-   *
-   *   center_x ::
-   *     The x~coordinate of the pivot point of the skew (in font units).
-   *
-   *   center_y ::
-   *     The y~coordinate of the pivot point of the skew (in font units).
-   */
-  typedef struct  FT_PaintSkew_
-  {
-    FT_OpaquePaint  paint;
-
-    FT_Fixed  x_skew_angle;
-    FT_Fixed  y_skew_angle;
-
-    FT_Fixed  center_x;
-    FT_Fixed  center_y;
-
-  } FT_PaintSkew;
-
-
-  /**************************************************************************
-   *
-   * @struct:
-   *   FT_PaintComposite
-   *
-   * @description:
-   *   A structure representing a 'COLR'v1 `PaintComposite` paint table.
-   *   Used for compositing two paints in a 'COLR' v1 directed acycling
-   *   graph.
-   *
-   * @fields:
-   *   source_paint ::
-   *     An @FT_OpaquePaint object referencing the source that is to be
-   *     composited.
-   *
-   *   composite_mode ::
-   *     An @FT_Composite_Mode enum value determining the composition
-   *     operation.
-   *
-   *   backdrop_paint ::
-   *     An @FT_OpaquePaint object referencing the backdrop paint that
-   *     `source_paint` is composited onto.
-   */
-  typedef struct  FT_PaintComposite_
-  {
-    FT_OpaquePaint     source_paint;
-    FT_Composite_Mode  composite_mode;
-    FT_OpaquePaint     backdrop_paint;
-
-  } FT_PaintComposite;
-
-
-  /**************************************************************************
-   *
-   * @union:
-   *   FT_COLR_Paint
-   *
-   * @description:
-   *   A union object representing format and details of a paint table of a
-   *   'COLR' v1 font, see
-   *   'https://github.com/googlefonts/colr-gradients-spec'.  Use
-   *   @FT_Get_Paint to retrieve a @FT_COLR_Paint for an @FT_OpaquePaint
-   *   object.
-   *
-   * @fields:
-   *   format ::
-   *     The gradient format for this Paint structure.
-   *
-   *   u ::
-   *     Union of all paint table types:
-   *
-   *       * @FT_PaintColrLayers
-   *       * @FT_PaintGlyph
-   *       * @FT_PaintSolid
-   *       * @FT_PaintLinearGradient
-   *       * @FT_PaintRadialGradient
-   *       * @FT_PaintSweepGradient
-   *       * @FT_PaintTransformed
-   *       * @FT_PaintTranslate
-   *       * @FT_PaintRotate
-   *       * @FT_PaintSkew
-   *       * @FT_PaintComposite
-   *       * @FT_PaintColrGlyph
-   */
-  typedef struct  FT_COLR_Paint_
-  {
-    FT_PaintFormat format;
-
-    union
-    {
-      FT_PaintColrLayers      colr_layers;
-      FT_PaintGlyph           glyph;
-      FT_PaintSolid           solid;
-      FT_PaintLinearGradient  linear_gradient;
-      FT_PaintRadialGradient  radial_gradient;
-      FT_PaintSweepGradient   sweep_gradient;
-      FT_PaintTransformed     transformed;
-      FT_PaintTranslate       translate;
-      FT_PaintRotate          rotate;
-      FT_PaintSkew            skew;
-      FT_PaintComposite       composite;
-      FT_PaintColrGlyph       colr_glyph;
-
-    } u;
-
-  } FT_COLR_Paint;
-
-
-  /**************************************************************************
-   *
-   * @enum:
-   *   FT_Color_Root_Transform
-   *
-   * @description:
-   *   An enumeration to specify whether @FT_Get_Color_Glyph_Paint is to
-   *   return a root transform to configure the client's graphics context
-   *   matrix.
-   *
-   * @values:
-   *   FT_COLOR_INCLUDE_ROOT_TRANSFORM ::
-   *     Do include the root transform as the initial @FT_COLR_Paint object.
-   *
-   *   FT_COLOR_NO_ROOT_TRANSFORM ::
-   *     Do not output an initial root transform.
-   */
-  typedef enum  FT_Color_Root_Transform_
-  {
-    FT_COLOR_INCLUDE_ROOT_TRANSFORM,
-    FT_COLOR_NO_ROOT_TRANSFORM,
-
-    FT_COLOR_ROOT_TRANSFORM_MAX
-
-  } FT_Color_Root_Transform;
-
-
-  /**************************************************************************
-   *
-   * @function:
-   *   FT_Get_Color_Glyph_Paint
-   *
-   * @description:
-   *   This is the starting point and interface to color gradient
-   *   information in a 'COLR' v1 table in OpenType fonts to recursively
-   *   retrieve the paint tables for the directed acyclic graph of a colored
-   *   glyph, given a glyph ID.
-   *
-   *     https://github.com/googlefonts/colr-gradients-spec
-   *
-   *   In a 'COLR' v1 font, each color glyph defines a directed acyclic
-   *   graph of nested paint tables, such as `PaintGlyph`, `PaintSolid`,
-   *   `PaintLinearGradient`, `PaintRadialGradient`, and so on.  Using this
-   *   function and specifying a glyph ID, one retrieves the root paint
-   *   table for this glyph ID.
-   *
-   *   This function allows control whether an initial root transform is
-   *   returned to configure scaling, transform, and translation correctly
-   *   on the client's graphics context.  The initial root transform is
-   *   computed and returned according to the values configured for @FT_Size
-   *   and @FT_Set_Transform on the @FT_Face object, see below for details
-   *   of the `root_transform` parameter.  This has implications for a
-   *   client 'COLR' v1 implementation: When this function returns an
-   *   initially computed root transform, at the time of executing the
-   *   @FT_PaintGlyph operation, the contours should be retrieved using
-   *   @FT_Load_Glyph at unscaled, untransformed size.  This is because the
-   *   root transform applied to the graphics context will take care of
-   *   correct scaling.
-   *
-   *   Alternatively, to allow hinting of contours, at the time of executing
-   *   @FT_Load_Glyph, the current graphics context transformation matrix
-   *   can be decomposed into a scaling matrix and a remainder, and
-   *   @FT_Load_Glyph can be used to retrieve the contours at scaled size.
-   *   Care must then be taken to blit or clip to the graphics context with
-   *   taking this remainder transformation into account.
-   *
-   * @input:
-   *   face ::
-   *     A handle to the parent face object.
-   *
-   *   base_glyph ::
-   *     The glyph index for which to retrieve the root paint table.
-   *
-   *   root_transform ::
-   *     Specifies whether an initially computed root is returned by the
-   *     @FT_PaintTransformed operation to account for the activated size
-   *     (see @FT_Activate_Size) and the configured transform and translate
-   *     (see @FT_Set_Transform).
-   *
-   *     This root transform is returned before nodes of the glyph graph of
-   *     the font are returned.  Subsequent @FT_COLR_Paint structures
-   *     contain unscaled and untransformed values.  The inserted root
-   *     transform enables the client application to apply an initial
-   *     transform to its graphics context.  When executing subsequent
-   *     FT_COLR_Paint operations, values from @FT_COLR_Paint operations
-   *     will ultimately be correctly scaled because of the root transform
-   *     applied to the graphics context.  Use
-   *     @FT_COLOR_INCLUDE_ROOT_TRANSFORM to include the root transform, use
-   *     @FT_COLOR_NO_ROOT_TRANSFORM to not include it.  The latter may be
-   *     useful when traversing the 'COLR' v1 glyph graph and reaching a
-   *     @FT_PaintColrGlyph.  When recursing into @FT_PaintColrGlyph and
-   *     painting that inline, no additional root transform is needed as it
-   *     has already been applied to the graphics context at the beginning
-   *     of drawing this glyph.
-   *
-   * @output:
-   *   paint ::
-   *     The @FT_OpaquePaint object that references the actual paint table.
-   *
-   *     The respective actual @FT_COLR_Paint object is retrieved via
-   *     @FT_Get_Paint.
-   *
-   * @return:
-   *   Value~1 if everything is OK.  If no color glyph is found, or the root
-   *   paint could not be retrieved, value~0 gets returned.  In case of an
-   *   error, value~0 is returned also.
-   */
-  FT_EXPORT( FT_Bool )
-  FT_Get_Color_Glyph_Paint( FT_Face                  face,
-                            FT_UInt                  base_glyph,
-                            FT_Color_Root_Transform  root_transform,
-                            FT_OpaquePaint*          paint );
-
-
-  /**************************************************************************
-   *
-   * @function:
-   *   FT_Get_Paint_Layers
-   *
-   * @description:
-   *   Access the layers of a `PaintColrLayers` table.
-   *
-   *   If the root paint of a color glyph, or a nested paint of a 'COLR'
-   *   glyph is a `PaintColrLayers` table, this function retrieves the
-   *   layers of the `PaintColrLayers` table.
-   *
-   *   The @FT_PaintColrLayers object contains an @FT_LayerIterator, which
-   *   is used here to iterate over the layers.  Each layer is returned as
-   *   an @FT_OpaquePaint object, which then can be used with @FT_Get_Paint
-   *   to retrieve the actual paint object.
-   *
-   * @input:
-   *   face ::
-   *     A handle to the parent face object.
-   *
-   * @inout:
-   *   iterator ::
-   *     The @FT_LayerIterator from an @FT_PaintColrLayers object, for which
-   *     the layers are to be retrieved.  The internal state of the iterator
-   *     is incremented after one call to this function for retrieving one
-   *     layer.
-   *
-   * @output:
-   *   paint ::
-   *     The @FT_OpaquePaint object that references the actual paint table.
-   *     The respective actual @FT_COLR_Paint object is retrieved via
-   *     @FT_Get_Paint.
-   *
-   * @return:
-   *   Value~1 if everything is OK.  Value~0 gets returned when the paint
-   *   object can not be retrieved or any other error occurs.
-   */
-  FT_EXPORT( FT_Bool )
-  FT_Get_Paint_Layers( FT_Face            face,
-                       FT_LayerIterator*  iterator,
-                       FT_OpaquePaint*    paint );
-
-
-  /**************************************************************************
-   *
-   * @function:
-   *   FT_Get_Colorline_Stops
-   *
-   * @description:
-   *   This is an interface to color gradient information in a 'COLR' v1
-   *   table in OpenType fonts to iteratively retrieve the gradient and
-   *   solid fill information for colored glyph layers for a specified glyph
-   *   ID.
-   *
-   *     https://github.com/googlefonts/colr-gradients-spec
-   *
-   * @input:
-   *   face ::
-   *     A handle to the parent face object.
-   *
-   * @inout:
-   *   iterator ::
-   *     The retrieved @FT_ColorStopIterator, configured on an @FT_ColorLine,
-   *     which in turn got retrieved via paint information in
-   *     @FT_PaintLinearGradient or @FT_PaintRadialGradient.
-   *
-   * @output:
-   *   color_stop ::
-   *     Color index and alpha value for the retrieved color stop.
-   *
-   * @return:
-   *   Value~1 if everything is OK.  If there are no more color stops,
-   *   value~0 gets returned.  In case of an error, value~0 is returned
-   *   also.
-   */
-  FT_EXPORT( FT_Bool )
-  FT_Get_Colorline_Stops( FT_Face                face,
-                          FT_ColorStop*          color_stop,
-                          FT_ColorStopIterator*  iterator );
-
-
-  /**************************************************************************
-   *
-   * @function:
-   *  FT_Get_Paint
-   *
-   * @description:
-   *   Access the details of a paint using an @FT_OpaquePaint opaque paint
-   *   object, which internally stores the offset to the respective `Paint`
-   *   object in the 'COLR' table.
-   *
-   * @input:
-   *   face ::
-   *     A handle to the parent face object.
-   *
-   *   opaque_paint ::
-   *     The opaque paint object for which the underlying @FT_COLR_Paint
-   *     data is to be retrieved.
-   *
-   * @output:
-   *   paint ::
-   *     The specific @FT_COLR_Paint object containing information coming
-   *     from one of the font's `Paint*` tables.
-   *
-   * @return:
-   *   Value~1 if everything is OK.  Value~0 if no details can be found for
-   *   this paint or any other error occured.
-   */
-  FT_EXPORT( FT_Bool )
-  FT_Get_Paint( FT_Face         face,
-                FT_OpaquePaint  opaque_paint,
-                FT_COLR_Paint*  paint );
-
-
-  /**************************************************************************
-   *
-   * @section:
    *   base_interface
    *
    */
@@ -5284,6 +4436,7 @@ FT_BEGIN_HEADER
    *
    * @since:
    *   2.3.8
+   *
    */
   FT_EXPORT( FT_UShort )
   FT_Get_FSType_Flags( FT_Face  face );
@@ -5377,6 +4530,7 @@ FT_BEGIN_HEADER
    *
    * @since:
    *   2.3.6
+   *
    */
   FT_EXPORT( FT_UInt )
   FT_Face_GetCharVariantIndex( FT_Face   face,
@@ -5413,6 +4567,7 @@ FT_BEGIN_HEADER
    *
    * @since:
    *   2.3.6
+   *
    */
   FT_EXPORT( FT_Int )
   FT_Face_GetCharVariantIsDefault( FT_Face   face,
@@ -5444,6 +4599,7 @@ FT_BEGIN_HEADER
    *
    * @since:
    *   2.3.6
+   *
    */
   FT_EXPORT( FT_UInt32* )
   FT_Face_GetVariantSelectors( FT_Face  face );
@@ -5477,6 +4633,7 @@ FT_BEGIN_HEADER
    *
    * @since:
    *   2.3.6
+   *
    */
   FT_EXPORT( FT_UInt32* )
   FT_Face_GetVariantsOfChar( FT_Face   face,
@@ -5511,6 +4668,7 @@ FT_BEGIN_HEADER
    *
    * @since:
    *   2.3.6
+   *
    */
   FT_EXPORT( FT_UInt32* )
   FT_Face_GetCharsOfVariant( FT_Face   face,
@@ -5783,8 +4941,8 @@ FT_BEGIN_HEADER
    *
    */
 #define FREETYPE_MAJOR  2
-#define FREETYPE_MINOR  10
-#define FREETYPE_PATCH  4
+#define FREETYPE_MINOR  12
+#define FREETYPE_PATCH  1
 
 
   /**************************************************************************
@@ -5846,6 +5004,7 @@ FT_BEGIN_HEADER
    *
    * @since:
    *   2.3.5
+   *
    */
   FT_EXPORT( FT_Bool )
   FT_Face_CheckTrueTypePatents( FT_Face  face );
@@ -5874,6 +5033,7 @@ FT_BEGIN_HEADER
    *
    * @since:
    *   2.3.5
+   *
    */
   FT_EXPORT( FT_Bool )
   FT_Face_SetUnpatentedHinting( FT_Face  face,
