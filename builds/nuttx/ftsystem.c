@@ -24,6 +24,8 @@
 #include <nuttx/config.h>
 #include <nuttx/mm/mm.h>
 #include <assert.h>
+#include <unistd.h>
+#include <fcntl.h>
 
   /**************************************************************************
    *
@@ -185,13 +187,13 @@
 
   /* We use the macro STREAM_FILE for convenience to extract the       */
   /* system-specific stream handle from a given FreeType stream object */
-#define STREAM_FILE( stream )  ( (FT_FILE*)stream->descriptor.pointer )
+#define STREAM_FILE( stream )  ( (int)stream->descriptor.pointer )
 
 
   /**************************************************************************
    *
    * @Function:
-   *   ft_ansi_stream_close
+   *   ft_posix_stream_close
    *
    * @Description:
    *   The function to close a stream.
@@ -201,9 +203,9 @@
    *     A pointer to the stream object.
    */
   FT_CALLBACK_DEF( void )
-  ft_ansi_stream_close( FT_Stream  stream )
+  ft_posix_stream_close( FT_Stream  stream )
   {
-    ft_fclose( STREAM_FILE( stream ) );
+    close( STREAM_FILE( stream ) );
 
     stream->descriptor.pointer = NULL;
     stream->size               = 0;
@@ -214,7 +216,7 @@
   /**************************************************************************
    *
    * @Function:
-   *   ft_ansi_stream_io
+   *   ft_posix_stream_io
    *
    * @Description:
    *   The function to open a stream.
@@ -238,12 +240,12 @@
    *   indicates an error.
    */
   FT_CALLBACK_DEF( unsigned long )
-  ft_ansi_stream_io( FT_Stream       stream,
-                     unsigned long   offset,
-                     unsigned char*  buffer,
-                     unsigned long   count )
+  ft_posix_stream_io( FT_Stream       stream,
+                      unsigned long   offset,
+                      unsigned char*  buffer,
+                      unsigned long   count )
   {
-    FT_FILE*  file;
+    int  file;
 
 
     if ( !count && offset > stream->size )
@@ -252,9 +254,9 @@
     file = STREAM_FILE( stream );
 
     if ( stream->pos != offset )
-      ft_fseek( file, (long)offset, SEEK_SET );
+      lseek( file, (off_t)offset, SEEK_SET );
 
-    return (unsigned long)ft_fread( buffer, 1, count, file );
+    return (unsigned long)read( file, buffer, count );
   }
 
 
@@ -264,7 +266,7 @@
   FT_Stream_Open( FT_Stream    stream,
                   const char*  filepathname )
   {
-    FT_FILE*  file;
+    int  file;
 
 
     if ( !stream )
@@ -277,8 +279,8 @@
     stream->read               = NULL;
     stream->close              = NULL;
 
-    file = ft_fopen( filepathname, "rbe" );
-    if ( !file )
+    file = open( filepathname, O_RDONLY | O_CLOEXEC );
+    if ( file < 0 )
     {
       FT_ERROR(( "FT_Stream_Open:"
                  " could not open `%s'\n", filepathname ));
@@ -286,20 +288,20 @@
       return FT_THROW( Cannot_Open_Resource );
     }
 
-    ft_fseek( file, 0, SEEK_END );
-    stream->size = (unsigned long)ft_ftell( file );
+    lseek( file, 0, SEEK_END );
+    stream->size = (unsigned long)lseek( file, 0, SEEK_CUR );
     if ( !stream->size )
     {
       FT_ERROR(( "FT_Stream_Open:" ));
       FT_ERROR(( " opened `%s' but zero-sized\n", filepathname ));
-      ft_fclose( file );
+      close( file );
       return FT_THROW( Cannot_Open_Stream );
     }
-    ft_fseek( file, 0, SEEK_SET );
+    lseek( file, 0, SEEK_SET );
 
-    stream->descriptor.pointer = file;
-    stream->read  = ft_ansi_stream_io;
-    stream->close = ft_ansi_stream_close;
+    stream->descriptor.pointer = (void *)file;
+    stream->read  = ft_posix_stream_io;
+    stream->close = ft_posix_stream_close;
 
     FT_TRACE1(( "FT_Stream_Open:" ));
     FT_TRACE1(( " opened `%s' (%ld bytes) successfully\n",
