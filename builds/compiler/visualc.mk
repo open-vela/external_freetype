@@ -3,7 +3,7 @@
 #
 
 
-# Copyright (C) 1996-2022 by
+# Copyright (C) 1996-2021 by
 # David Turner, Robert Wilhelm, and Werner Lemberg.
 #
 # This file is part of the FreeType project, and may only be used, modified,
@@ -70,7 +70,7 @@ CFLAGS ?= /nologo /c /Ox /W3 /WX
 
 # ANSIFLAGS: Put there the flags used to make your compiler ANSI-compliant.
 #
-ANSIFLAGS ?= /Za /D_CRT_SECURE_NO_DEPRECATE
+ANSIFLAGS := /Za /D_CRT_SECURE_NO_DEPRECATE
 
 
 # Library linking

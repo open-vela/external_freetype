@@ -4,7 +4,7 @@
  *
  *   Debugging and logging component (specification).
  *
- * Copyright (C) 1996-2022 by
+ * Copyright (C) 1996-2021 by
  * David Turner, Robert Wilhelm, and Werner Lemberg.
  *
  * This file is part of the FreeType project, and may only be used,
@@ -32,7 +32,6 @@
 #include "compiler-macros.h"
 
 #ifdef FT_DEBUG_LOGGING
-#define DLG_STATIC
 #include <dlg/output.h>
 #include <dlg/dlg.h>
 
@@ -115,16 +114,11 @@ FT_BEGIN_HEADER
 #define FT_LOGGING_TAG( x )   FT_LOGGING_TAG_( x )
 #define FT_LOGGING_TAG_( x )  #x
 
-  /* we need two macros to convert the component and the trace level */
-  /* to a string that combines them                                  */
-#define FT_LOGGING_TAGX( x, y )   FT_LOGGING_TAGX_( x, y )
-#define FT_LOGGING_TAGX_( x, y )  #x ":" #y
-
 
 #define FT_LOG( level, varformat )                                         \
           do                                                               \
           {                                                                \
-            const char*  dlg_tag = FT_LOGGING_TAGX( FT_COMPONENT, level ); \
+            const char*  dlg_tag = FT_LOGGING_TAG( FT_COMPONENT );         \
                                                                            \
                                                                            \
             ft_add_tag( dlg_tag );                                         \

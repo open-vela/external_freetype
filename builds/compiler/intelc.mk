@@ -3,7 +3,7 @@
 #
 
 
-# Copyright (C) 1996-2022 by
+# Copyright (C) 1996-2021 by
 # David Turner, Robert Wilhelm, and Werner Lemberg.
 #
 # This file is part of the FreeType project, and may only be used, modified,
@@ -74,7 +74,7 @@ CFLAGS ?= /nologo /c /Ox /G5 /W3 /Qwd32
 
 # ANSIFLAGS: Put there the flags used to make your compiler ANSI-compliant.
 #
-ANSIFLAGS ?= /Qansi_alias /Za
+ANSIFLAGS := /Qansi_alias /Za
 
 # Library linking
 #
