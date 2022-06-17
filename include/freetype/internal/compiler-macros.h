@@ -4,7 +4,7 @@
  *
  *   Compiler-specific macro definitions used internally by FreeType.
  *
- * Copyright (C) 2020-2021 by
+ * Copyright (C) 2020-2022 by
  * David Turner, Robert Wilhelm, and Werner Lemberg.
  *
  * This file is part of the FreeType project, and may only be used,
@@ -71,12 +71,18 @@ FT_BEGIN_HEADER
    */
 #define FT_DUMMY_STMNT  FT_BEGIN_STMNT FT_END_STMNT
 
-#ifdef _WIN64
+#ifdef __UINTPTR_TYPE__
+  /*
+   * GCC and Clang both provide a `__UINTPTR_TYPE__` that can be used to
+   * avoid a dependency on `stdint.h`.
+   */
+#  define FT_UINT_TO_POINTER( x )  (void *)(__UINTPTR_TYPE__)(x)
+#elif defined( _WIN64 )
   /* only 64bit Windows uses the LLP64 data model, i.e., */
   /* 32-bit integers, 64-bit pointers.                   */
-#define FT_UINT_TO_POINTER( x )  (void *)(unsigned __int64)(x)
+#  define FT_UINT_TO_POINTER( x )  (void *)(unsigned __int64)(x)
 #else
-#define FT_UINT_TO_POINTER( x )  (void *)(unsigned long)(x)
+#  define FT_UINT_TO_POINTER( x )  (void *)(unsigned long)(x)
 #endif
 
   /*
@@ -293,10 +299,12 @@ FT_BEGIN_HEADER
 #define FT_CALLBACK_DEF( x )  static  x
 #endif
 
-#if defined( __i386__ )
+#if defined( __GNUC__ ) && defined( __i386__ )
 #define FT_COMPARE_DEF( x )  FT_CALLBACK_DEF( x ) __attribute__(( cdecl ))
-#elif defined( _M_IX86 )
+#elif defined( _MSC_VER ) && defined( _M_IX86 )
 #define FT_COMPARE_DEF( x )  FT_CALLBACK_DEF( x ) __cdecl
+#elif defined( __WATCOMC__ ) && __WATCOMC__ >= 1240
+#define FT_COMPARE_DEF( x )  FT_CALLBACK_DEF( x ) __watcall
 #else
 #define FT_COMPARE_DEF( x )  FT_CALLBACK_DEF( x )
 #endif
