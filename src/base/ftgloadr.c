@@ -4,7 +4,7 @@
  *
  *   The FreeType glyph loader (body).
  *
- * Copyright (C) 2002-2021 by
+ * Copyright (C) 2002-2022 by
  * David Turner, Robert Wilhelm, and Werner Lemberg
  *
  * This file is part of the FreeType project, and may only be used,
@@ -217,7 +217,7 @@
 
     error = FT_GlyphLoader_CreateExtra( loader );
     if ( error )
-      return error;
+      goto Exit;
 
     /* check points & tags */
     new_max = (FT_UInt)base->n_points + (FT_UInt)current->n_points +
@@ -227,7 +227,10 @@
     if ( new_max > old_max )
     {
       if ( new_max > FT_OUTLINE_POINTS_MAX )
-        return FT_THROW( Array_Too_Large );
+      {
+        error = FT_THROW( Array_Too_Large );
+        goto Exit;
+      }
 
       min_new_max = old_max + ( old_max >> 1 );
       if ( new_max < min_new_max )
@@ -259,7 +262,7 @@
 
     error = FT_GlyphLoader_CreateExtra( loader );
     if ( error )
-      return error;
+      goto Exit;
 
     /* check contours */
     old_max = loader->max_contours;
@@ -268,7 +271,10 @@
     if ( new_max > old_max )
     {
       if ( new_max > FT_OUTLINE_CONTOURS_MAX )
-        return FT_THROW( Array_Too_Large );
+      {
+        error = FT_THROW( Array_Too_Large );
+        goto Exit;
+      }
 
       min_new_max = old_max + ( old_max >> 1 );
       if ( new_max < min_new_max )
