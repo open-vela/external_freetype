@@ -4,7 +4,7 @@
  *
  *   FreeType Signed Distance Field renderer module component (body only).
  *
- * Copyright (C) 2020-2022 by
+ * Copyright (C) 2020-2021 by
  * David Turner, Robert Wilhelm, and Werner Lemberg.
  *
  * Written by Anuj Verma.
@@ -21,7 +21,6 @@
 #define FT_MAKE_OPTION_SINGLE_OBJECT
 
 #include "ftsdfrend.c"
-#include "ftsdfcommon.c"
 #include "ftbsdf.c"
 #include "ftsdf.c"
 
