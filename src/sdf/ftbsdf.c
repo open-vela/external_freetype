@@ -4,7 +4,7 @@
  *
  *   Signed Distance Field support for bitmap fonts (body only).
  *
- * Copyright (C) 2020-2021 by
+ * Copyright (C) 2020-2022 by
  * David Turner, Robert Wilhelm, and Werner Lemberg.
  *
  * Written by Anuj Verma.
@@ -163,7 +163,7 @@
   {
     FT_Memory  memory;
 
-  } BSDF_TRaster;
+  } BSDF_TRaster, *BSDF_PRaster;
 
 
   /**************************************************************************
@@ -177,11 +177,11 @@
    *
    * @Fields:
    *   dist ::
-   *     Vector length of the `near` parameter.  Can be squared or absolute
+   *     Vector length of the `prox` parameter.  Can be squared or absolute
    *     depending on the `USE_SQUARED_DISTANCES` macro defined in file
    *     `ftsdfcommon.h`.
    *
-   *   near ::
+   *   prox ::
    *     Vector to the nearest edge.  Can also be interpreted as shortest
    *     distance of a point.
    *
@@ -194,7 +194,7 @@
   typedef struct  ED_
   {
     FT_16D16      dist;
-    FT_16D16_Vec  near;
+    FT_16D16_Vec  prox;
     FT_Byte       alpha;
 
   } ED;
@@ -289,19 +289,22 @@
 #undef CHECK_NEIGHBOR
 #endif
 
-#define CHECK_NEIGHBOR( x_offset, y_offset )            \
-          if ( x + x_offset >= 0 && x + x_offset < w && \
-               y + y_offset >= 0 && y + y_offset < r )  \
-          {                                             \
-            num_neighbors++;                            \
-                                                        \
-            to_check = dm + y_offset * w + x_offset;    \
-            if ( to_check->alpha == 0 )                 \
-            {                                           \
-              is_edge = 1;                              \
-              goto Done;                                \
-            }                                           \
-          }
+#define CHECK_NEIGHBOR( x_offset, y_offset )              \
+          do                                              \
+          {                                               \
+            if ( x + x_offset >= 0 && x + x_offset < w && \
+                 y + y_offset >= 0 && y + y_offset < r )  \
+            {                                             \
+              num_neighbors++;                            \
+                                                          \
+              to_check = dm + y_offset * w + x_offset;    \
+              if ( to_check->alpha == 0 )                 \
+              {                                           \
+                is_edge = 1;                              \
+                goto Done;                                \
+              }                                           \
+            }                                             \
+          } while ( 0 )
 
   static FT_Bool
   bsdf_is_edge( ED*     dm,   /* distance map              */
@@ -592,18 +595,18 @@
                            worker->rows ) )
         {
           /* approximate the edge distance for edge pixels */
-          ed[index].near = compute_edge_distance( ed + index,
+          ed[index].prox = compute_edge_distance( ed + index,
                                                   i, j,
                                                   worker->width,
                                                   worker->rows );
-          ed[index].dist = VECTOR_LENGTH_16D16( ed[index].near );
+          ed[index].dist = VECTOR_LENGTH_16D16( ed[index].prox );
         }
         else
         {
           /* for non-edge pixels assign far away distances */
           ed[index].dist   = 400 * ONE;
-          ed[index].near.x = 200 * ONE;
-          ed[index].near.y = 200 * ONE;
+          ed[index].prox.x = 200 * ONE;
+          ed[index].prox.y = 200 * ONE;
         }
       }
     }
@@ -693,8 +696,8 @@
 
     /* Calculate the width and row differences */
     /* between target and source.              */
-    x_diff = worker->width - source->width;
-    y_diff = worker->rows - source->rows;
+    x_diff = worker->width - (int)source->width;
+    y_diff = worker->rows - (int)source->rows;
 
     x_diff /= 2;
     y_diff /= 2;
@@ -716,8 +719,8 @@
       {
         FT_Int  t_width = worker->width;
         FT_Int  t_rows  = worker->rows;
-        FT_Int  s_width = source->width;
-        FT_Int  s_rows  = source->rows;
+        FT_Int  s_width = (int)source->width;
+        FT_Int  s_rows  = (int)source->rows;
 
 
         for ( t_j = 0; t_j < t_rows; t_j++ )
@@ -750,11 +753,9 @@
             mod = 7 - s_i % 8;
 
             pixel = s[div];
-            byte  = 1 << mod;
+            byte  = (FT_Byte)( 1 << mod );
 
             t[t_index].alpha = pixel & byte ? 255 : 0;
-
-            pixel = 0;
           }
         }
       }
@@ -764,8 +765,8 @@
       {
         FT_Int  t_width = worker->width;
         FT_Int  t_rows  = worker->rows;
-        FT_Int  s_width = source->width;
-        FT_Int  s_rows  = source->rows;
+        FT_Int  s_width = (int)source->width;
+        FT_Int  s_rows  = (int)source->rows;
 
 
         /* loop over all pixels and assign pixel values from source */
@@ -870,7 +871,7 @@
 
     if ( dist < current->dist )
     {
-      dist_vec = to_check->near;
+      dist_vec = to_check->prox;
 
       dist_vec.x += x_offset * ONE;
       dist_vec.y += y_offset * ONE;
@@ -879,7 +880,7 @@
       if ( dist < current->dist )
       {
         current->dist = dist;
-        current->near = dist_vec;
+        current->prox = dist_vec;
       }
     }
   }
@@ -925,7 +926,7 @@
 
       /* Forward pass of rows (left -> right).  Leave the first  */
       /* column, which gets covered in the backward pass.        */
-      for ( i = 1; i < w; i++ )
+      for ( i = 1; i < w - 1; i++ )
       {
         index   = j * w + i;
         current = dm + index;
@@ -994,7 +995,7 @@
 
       /* Forward pass of rows (left -> right).  Leave the first */
       /* column, which gets covered in the backward pass.       */
-      for ( i = 1; i < w; i++ )
+      for ( i = 1; i < w - 1; i++ )
       {
         index   = j * w + i;
         current = dm + index;
@@ -1091,10 +1092,11 @@
   {
     FT_Error  error = FT_Err_Ok;
 
-    FT_Int    w, r;
-    FT_Int    i, j;
-    FT_6D10*  t_buffer;
-    FT_16D16  spread;
+    FT_Int  w, r;
+    FT_Int  i, j;
+
+    FT_SDFFormat*  t_buffer;
+    FT_16D16       sp_sq, spread;
 
 
     if ( !worker || !target )
@@ -1103,9 +1105,9 @@
       goto Exit;
     }
 
-    w        = target->width;
-    r        = target->rows;
-    t_buffer = (FT_6D10*)target->buffer;
+    w        = (int)target->width;
+    r        = (int)target->rows;
+    t_buffer = (FT_SDFFormat*)target->buffer;
 
     if ( w != worker->width ||
          r != worker->rows  )
@@ -1114,36 +1116,34 @@
       goto Exit;
     }
 
-#if USE_SQUARED_DISTANCES
-    spread = FT_INT_16D16( worker->params.spread *
-                           worker->params.spread );
-#else
     spread = FT_INT_16D16( worker->params.spread );
+
+#if USE_SQUARED_DISTANCES
+    sp_sq = FT_INT_16D16( worker->params.spread *
+                          worker->params.spread );
+#else
+    sp_sq = FT_INT_16D16( worker->params.spread );
 #endif
 
     for ( j = 0; j < r; j++ )
     {
       for ( i = 0; i < w; i++ )
       {
-        FT_Int    index;
-        FT_16D16  dist;
-        FT_6D10   final_dist;
-        FT_Char   sign;
+        FT_Int        index;
+        FT_16D16      dist;
+        FT_SDFFormat  final_dist;
+        FT_Char       sign;
 
 
         index = j * w + i;
         dist  = worker->distance_map[index].dist;
 
-        if ( dist < 0 || dist > spread )
-          dist = spread;
+        if ( dist < 0 || dist > sp_sq )
+          dist = sp_sq;
 
 #if USE_SQUARED_DISTANCES
         dist = square_root( dist );
 #endif
-
-        /* convert from 16.16 to 6.10 */
-        dist      /= 64;
-        final_dist = (FT_6D10)(dist & 0x0000FFFF);
 
         /* We assume that if the pixel is inside a contour */
         /* its coverage value must be > 127.               */
@@ -1153,7 +1153,10 @@
         if ( worker->params.flip_sign )
           sign = -sign;
 
-        t_buffer[index] = final_dist * sign;
+        /* concatenate from 16.16 to appropriate format */
+        final_dist = map_fixed_to_sdf( dist * sign, spread );
+
+        t_buffer[index] = final_dist;
       }
     }
 
@@ -1170,19 +1173,17 @@
 
   /* called when adding a new module through @FT_Add_Module */
   static FT_Error
-  bsdf_raster_new( FT_Memory   memory,
-                   FT_Raster*  araster )
+  bsdf_raster_new( FT_Memory      memory,
+                   BSDF_PRaster*  araster )
   {
-    FT_Error       error  = FT_Err_Ok;
-    BSDF_TRaster*  raster = NULL;
+    FT_Error      error;
+    BSDF_PRaster  raster = NULL;
 
 
-    *araster = 0;
-    if ( !FT_ALLOC( raster, sizeof ( BSDF_TRaster ) ) )
-    {
+    if ( !FT_NEW( raster ) )
       raster->memory = memory;
-      *araster       = (FT_Raster)raster;
-    }
+
+    *araster = raster;
 
     return error;
   }
@@ -1222,8 +1223,8 @@
     FT_Error   error  = FT_Err_Ok;
     FT_Memory  memory = NULL;
 
-    const FT_Bitmap*  source      = NULL;
-    const FT_Bitmap*  target      = NULL;
+    const FT_Bitmap*  source = NULL;
+    const FT_Bitmap*  target = NULL;
 
     BSDF_TRaster*  bsdf_raster = (BSDF_TRaster*)raster;
     BSDF_Worker    worker;
@@ -1247,8 +1248,8 @@
       goto Exit;
     }
 
-    source = sdf_params->root.source;
-    target = sdf_params->root.target;
+    source = (const FT_Bitmap*)sdf_params->root.source;
+    target = (const FT_Bitmap*)sdf_params->root.target;
 
     /* check source and target bitmap */
     if ( !source || !target )
@@ -1298,8 +1299,8 @@
                          target->width * sizeof ( *worker.distance_map ) ) )
       goto Exit;
 
-    worker.width  = target->width;
-    worker.rows   = target->rows;
+    worker.width  = (int)target->width;
+    worker.rows   = (int)target->rows;
     worker.params = *sdf_params;
 
     FT_CALL( bsdf_init_distance_map( source, &worker ) );
@@ -1309,7 +1310,7 @@
 
     FT_TRACE0(( "bsdf_raster_render: Total memory used = %ld\n",
                 worker.width * worker.rows *
-                  sizeof ( *worker.distance_map ) ));
+                  (long)sizeof ( *worker.distance_map ) ));
 
   Exit:
     if ( worker.distance_map )
