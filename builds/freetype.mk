@@ -3,7 +3,7 @@
 #
 
 
-# Copyright (C) 1996-2021 by
+# Copyright (C) 1996-2022 by
 # David Turner, Robert Wilhelm, and Werner Lemberg.
 #
 # This file is part of the FreeType project, and may only be used, modified,
@@ -358,12 +358,12 @@ distclean_project_dos: clean_project_dos
 	-$(DELETE) $(subst /,$(SEP),$(PROJECT_LIBRARY) $(DISTCLEAN) $(NO_OUTPUT))
 
 
-.PHONY: remove_ftmodule_h
+.PHONY: remove_config_mk remove_ftmodule_h
 
 # Remove configuration file (used for distclean).
 #
-#remove_config_mk:
-#	-$(DELETE) $(subst /,$(SEP),$(CONFIG_MK) $(NO_OUTPUT))
+remove_config_mk:
+	-$(DELETE) $(subst /,$(SEP),$(CONFIG_MK) $(NO_OUTPUT))
 
 # Remove module list (used for distclean).
 #
@@ -378,7 +378,7 @@ remove_ftmodule_h:
 # versions from above, or simply provide their own implementation.
 #
 clean: clean_project
-distclean: distclean_project remove_ftmodule_h
+distclean: distclean_project remove_config_mk remove_ftmodule_h
 	-$(DELETE) $(subst /,$(SEP),$(DOC_DIR)/*.html $(NO_OUTPUT))
 
 
