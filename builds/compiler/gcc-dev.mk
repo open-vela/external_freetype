@@ -3,7 +3,7 @@
 #
 
 
-# Copyright (C) 1996-2022 by
+# Copyright (C) 1996-2021 by
 # David Turner, Robert Wilhelm, and Werner Lemberg.
 #
 # This file is part of the FreeType project, and may only be used, modified,
@@ -82,9 +82,8 @@ ifndef CFLAGS
 endif
 
 # ANSIFLAGS: Put there the flags used to make your compiler ANSI-compliant.
-# You can override this on the command line.
 #
-ANSIFLAGS ?= -std=c99 -pedantic
+ANSIFLAGS := -std=c99 -pedantic
 
 
 # Library linking
