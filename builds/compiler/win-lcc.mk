@@ -3,7 +3,7 @@
 #
 
 
-# Copyright (C) 1996-2022 by
+# Copyright (C) 1996-2021 by
 # David Turner, Robert Wilhelm, and Werner Lemberg.
 #
 # This file is part of the FreeType project, and may only be used, modified,
@@ -69,7 +69,7 @@ CFLAGS ?= -c -g2 -O
 #
 #  LCC is pure ANSI anyway!
 #
-ANSIFLAGS ?=
+ANSIFLAGS :=
 
 
 # library linking
