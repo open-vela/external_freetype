@@ -363,7 +363,7 @@ distclean_project_dos: clean_project_dos
 # Remove configuration file (used for distclean).
 #
 remove_config_mk:
-	-$(DELETE) $(subst /,$(SEP),$(CONFIG_MK) $(NO_OUTPUT))
+	-$(DELETE) $(subst /,$(SEP),$(TOP_DIR)/config.mk $(NO_OUTPUT))
 
 # Remove module list (used for distclean).
 #
