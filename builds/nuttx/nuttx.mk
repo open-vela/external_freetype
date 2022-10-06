@@ -16,10 +16,12 @@ include $(TOP_DIR)/builds/nuttx/nuttx-def.mk
 
 OLD_CC := $(CC)
 include $(TOP_DIR)/builds/compiler/gcc.mk
-CC = $(OLD_CC) -DFT_CONFIG_MODULES_H=\"ftmodule.h\" -DFT_CONFIG_OPTIONS_H=\"ftoption.h\" -c
+CC = $(OLD_CC) -c
+
 LINK_LIBRARY = $(call ARLOCK, $(BIN), $(OBJECTS_LIST))
 CLEAN_LIBRARY =
 
+FTSYS_SRC = $(PLATFORM_DIR)/ftsystem.c
 include $(TOP_DIR)/builds/link_std.mk
 
 
