@@ -82,7 +82,7 @@ MODULES := $(FONT_MODULES)    \
            $(AUX_MODULES)
 
 
-CONFIG_MK ?= config.mk
+CONFIG_MK ?= $(TOP_DIR)/config.mk
 
 # If no configuration sub-makefile is present, or if `setup' is the target
 # to be built, run the auto-detection rules to figure out which
