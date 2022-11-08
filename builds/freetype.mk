@@ -378,7 +378,7 @@ remove_ftmodule_h:
 # versions from above, or simply provide their own implementation.
 #
 clean: clean_project
-distclean: distclean_project remove_config_mk remove_ftmodule_h
+distclean:: distclean_project remove_config_mk remove_ftmodule_h
 	-$(DELETE) $(subst /,$(SEP),$(DOC_DIR)/*.html $(NO_OUTPUT))
 
 
