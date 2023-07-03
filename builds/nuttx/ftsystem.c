@@ -187,7 +187,7 @@
 
   /* We use the macro STREAM_FILE for convenience to extract the       */
   /* system-specific stream handle from a given FreeType stream object */
-#define STREAM_FILE( stream )  ( (int)stream->descriptor.pointer )
+#define STREAM_FILE( stream )  ( (int)(intptr_t)stream->descriptor.pointer )
 
 
   /**************************************************************************
@@ -299,7 +299,7 @@
     }
     lseek( file, 0, SEEK_SET );
 
-    stream->descriptor.pointer = (void *)file;
+    stream->descriptor.pointer = (void *)(intptr_t)file;
     stream->read  = ft_posix_stream_io;
     stream->close = ft_posix_stream_close;
 
