@@ -250,6 +250,7 @@
                       unsigned long   count )
   {
     int  file;
+    unsigned long total = 0;
 
 
     if ( !count && offset > stream->size )
@@ -260,7 +261,21 @@
     if ( stream->pos != offset )
       lseek( file, (off_t)offset, SEEK_SET );
 
-    return count ? (unsigned long)read( file, buffer, count ) : 0;
+    if( count == 0 )
+      return 0;
+
+    while ( total < count )
+    {
+      size_t remain = count - total;
+      ssize_t rd = read( file, buffer + total, remain );
+
+      if ( rd <= 0 )
+        break;
+
+      total += rd;
+    }
+
+    return total;
   }
 
 
