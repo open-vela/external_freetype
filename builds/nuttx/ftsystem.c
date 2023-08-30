@@ -185,9 +185,13 @@
 #undef  FT_COMPONENT
 #define FT_COMPONENT  io
 
-  /* We use the macro STREAM_FILE for convenience to extract the       */
-  /* system-specific stream handle from a given FreeType stream object */
-#define STREAM_FILE( stream )  ( (int)(intptr_t)stream->descriptor.pointer )
+  /* We use the macro STREAM_PTR for convenience to extract the           */
+  /* system-specific stream handle from a given FreeType stream object.   */
+  /* The reason for 'fd + 1' is because open() may return a legal fd with */
+  /* a value of 0, preventing it from being judged as NULL when converted */
+  /* to a pointer type                                                    */
+#define STREAM_PTR_TO_FD( stream )  ( (int)(intptr_t)stream->descriptor.pointer - 1 )
+#define FD_TO_STREAM_PTR( fd )      ( (void *)(intptr_t)( fd + 1 ) )
 
 
   /**************************************************************************
@@ -205,7 +209,7 @@
   FT_CALLBACK_DEF( void )
   ft_posix_stream_close( FT_Stream  stream )
   {
-    close( STREAM_FILE( stream ) );
+    close( STREAM_PTR_TO_FD( stream ) );
 
     stream->descriptor.pointer = NULL;
     stream->size               = 0;
@@ -251,7 +255,7 @@
     if ( !count && offset > stream->size )
       return 1;
 
-    file = STREAM_FILE( stream );
+    file = STREAM_PTR_TO_FD( stream );
 
     if ( stream->pos != offset )
       lseek( file, (off_t)offset, SEEK_SET );
@@ -299,7 +303,7 @@
     }
     lseek( file, 0, SEEK_SET );
 
-    stream->descriptor.pointer = (void *)(intptr_t)file;
+    stream->descriptor.pointer = FD_TO_STREAM_PTR( file );
     stream->read  = ft_posix_stream_io;
     stream->close = ft_posix_stream_close;
 
