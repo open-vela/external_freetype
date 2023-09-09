@@ -18,7 +18,7 @@ OLD_CC := $(CC)
 include $(TOP_DIR)/builds/compiler/gcc.mk
 CC = $(OLD_CC) -c
 
-LINK_LIBRARY = $(call ARCHIVE_ADD, $(BIN), $(OBJECTS_LIST))
+LINK_LIBRARY = $(call ARLOCK, $(BIN), $(OBJECTS_LIST))
 CLEAN_LIBRARY =
 
 FTSYS_SRC = $(PLATFORM_DIR)/ftsystem.c
