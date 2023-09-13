@@ -27,6 +27,9 @@
 #include <assert.h>
 #include <unistd.h>
 #include <fcntl.h>
+#ifdef CONFIG_LIB_FREETYPE_MBFC
+#include "mbfc.h"
+#endif
 
 #ifdef CONFIG_TRACE_FS
 #  define FT_TRACE_BEGIN sched_note_beginex(NOTE_TAG_FS, __func__)
@@ -199,9 +202,93 @@
   /* The reason for 'fd + 1' is because open() may return a legal fd with */
   /* a value of 0, preventing it from being judged as NULL when converted */
   /* to a pointer type                                                    */
-#define STREAM_PTR_TO_FD( stream )  ( (int)(intptr_t)stream->descriptor.pointer - 1 )
-#define FD_TO_STREAM_PTR( fd )      ( (void *)(intptr_t)( fd + 1 ) )
 
+#define FD_TO_PTR( fd )             ( (void *)(intptr_t)( fd + 1 ) )
+#define PTR_TO_FD( ptr )            ( (int)(intptr_t)ptr - 1 )
+#define STREAM_PTR_TO_FD( stream )  PTR_TO_FD( stream->descriptor.pointer )
+
+#ifdef CONFIG_LIB_FREETYPE_MBFC
+
+#define STREAM_TO_MBFC( stream )    ((mbfc_t *)stream->descriptor.pointer)
+
+/* Mult-block file cache */
+static ssize_t mbfc_read_cb(void* fp, void* buf, size_t nbytes)
+{
+  return read(PTR_TO_FD(fp), buf, nbytes);
+}
+
+static off_t mbfc_seek_cb(void* fp, off_t pos, int whence)
+{
+  return lseek(PTR_TO_FD(fp), pos, whence);
+}
+
+  /**************************************************************************
+   *
+   * @Function:
+   *   ft_mbfc_stream_close
+   *
+   * @Description:
+   *   The function to close a stream.
+   *
+   * @Input:
+   *   stream ::
+   *     A pointer to the multi-block file cache stream object.
+   */
+  FT_CALLBACK_DEF( void )
+  ft_mbfc_stream_close( FT_Stream  stream )
+  {
+    mbfc_t *mbfc = STREAM_TO_MBFC(stream);
+    int fd = (int)(intptr_t)mbfc->param.fp;
+    mbfc_delete(mbfc);
+    close(fd);
+
+    stream->descriptor.pointer = NULL;
+    stream->size               = 0;
+    stream->base               = NULL;
+  }
+
+
+/**************************************************************************
+   *
+   * @Function:
+   *   ft_mbfc_stream_io
+   *
+   * @Description:
+   *   The function to open a stream.
+   *
+   * @Input:
+   *   stream ::
+   *     A pointer to the stream object.
+   *
+   *   offset ::
+   *     The position in the data stream to start reading.
+   *
+   *   buffer ::
+   *     The address of buffer to store the read data.
+   *
+   *   count ::
+   *     The number of bytes to read from the stream.
+   *
+   * @Return:
+   *   The number of bytes actually read.  If `count' is zero (this is,
+   *   the function is used for seeking), a non-zero return value
+   *   indicates an error.
+   */
+  FT_CALLBACK_DEF( unsigned long )
+  ft_mbfc_stream_io( FT_Stream       stream,
+                   unsigned long   offset,
+                   unsigned char*  buffer,
+                   unsigned long   count )
+  {
+    if ( !count && offset > stream->size )
+      return 1;
+
+    mbfc_t *mbfc = STREAM_TO_MBFC(stream);
+    ssize_t br = mbfc_read(mbfc, offset, buffer, count);
+
+    return br > 0 ? (unsigned long)br : 0;
+  }
+#else
 
   /**************************************************************************
    *
@@ -296,6 +383,7 @@
     return total;
   }
 
+#endif
 
   /* documentation is in ftstream.h */
 
@@ -339,9 +427,24 @@
     }
     lseek( file, 0, SEEK_SET );
 
-    stream->descriptor.pointer = FD_TO_STREAM_PTR( file );
+#ifdef CONFIG_LIB_FREETYPE_MBFC
+    mbfc_param_t param;
+    mbfc_param_init(&param);
+    param.fp = FD_TO_PTR( file );
+    param.block_size = CONFIG_LIB_FREETYPE_MBFC_BLOCK_SIZE;
+    param.cache_num = CONFIG_LIB_FREETYPE_MBFC_CACHE_NUM;
+    param.read_cb = mbfc_read_cb;
+    param.seek_cb = mbfc_seek_cb;
+    mbfc_t *mbfc = mbfc_create(&param);
+
+    stream->descriptor.pointer = mbfc;
+    stream->read  = ft_mbfc_stream_io;
+    stream->close = ft_mbfc_stream_close;
+#else
+    stream->descriptor.pointer = FD_TO_PTR( file );
     stream->read  = ft_posix_stream_io;
     stream->close = ft_posix_stream_close;
+#endif
 
     FT_TRACE1(( "FT_Stream_Open:" ));
     FT_TRACE1(( " opened `%s' (%ld bytes) successfully\n",
