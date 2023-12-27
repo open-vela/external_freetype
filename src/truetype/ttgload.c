@@ -2222,6 +2222,8 @@
 
 #endif
 
+    loader->stream = NULL;
+
     return error;
   }
 
