@@ -1711,6 +1711,8 @@ typedef ptrdiff_t  FT_PtrDist;
       } while ( band >= bands );
     }
 
+    ras.ycells = NULL;
+
     return 0;
   }
 
