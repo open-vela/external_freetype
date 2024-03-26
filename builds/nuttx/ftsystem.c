@@ -272,7 +272,7 @@
       if ( rd <= 0 )
         break;
 
-      total += rd;
+      total += (unsigned long)rd;
     }
 
     return total;
