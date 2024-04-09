@@ -22,10 +22,14 @@
 #include <freetype/fterrors.h>
 #include <freetype/fttypes.h>
 #include <nuttx/config.h>
+#include <nuttx/trace.h>
 #include <nuttx/mm/mm.h>
 #include <assert.h>
 #include <unistd.h>
 #include <fcntl.h>
+
+#define FT_TRACE_BEGIN fs_trace_begin()
+#define FT_TRACE_END fs_trace_end()
 
   /**************************************************************************
    *
@@ -209,11 +213,13 @@
   FT_CALLBACK_DEF( void )
   ft_posix_stream_close( FT_Stream  stream )
   {
+    FT_TRACE_BEGIN;
     close( STREAM_PTR_TO_FD( stream ) );
 
     stream->descriptor.pointer = NULL;
     stream->size               = 0;
     stream->base               = NULL;
+    FT_TRACE_END;
   }
 
 
@@ -251,18 +257,24 @@
   {
     int  file;
     unsigned long total = 0;
-
+    FT_TRACE_BEGIN;
 
     if ( !count && offset > stream->size )
+    {
+      FT_TRACE_END;
       return 1;
+    }
 
     file = STREAM_PTR_TO_FD( stream );
 
     if ( stream->pos != offset )
       lseek( file, (off_t)offset, SEEK_SET );
 
-    if( count == 0 )
+    if ( count == 0 )
+    {
+      FT_TRACE_END;
       return 0;
+    }
 
     while ( total < count )
     {
@@ -275,6 +287,7 @@
       total += (unsigned long)rd;
     }
 
+    FT_TRACE_END;
     return total;
   }
 
@@ -298,7 +311,10 @@
     stream->read               = NULL;
     stream->close              = NULL;
 
+    FT_TRACE_BEGIN;
     file = open( filepathname, O_RDONLY | O_CLOEXEC );
+    FT_TRACE_END;
+
     if ( file < 0 )
     {
       FT_ERROR(( "FT_Stream_Open:"
