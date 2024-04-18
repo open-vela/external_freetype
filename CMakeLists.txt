@@ -361,7 +361,12 @@ if (UNIX)
 elseif (WIN32)
   list(APPEND BASE_SRCS "builds/windows/ftsystem.c")
 else ()
-  list(APPEND BASE_SRCS "src/base/ftsystem.c")
+
+  if(NOT FTSYSTEM_SRC)
+    set(FTSYSTEM_SRC "src/base/ftsystem.c")
+  endif()
+
+  list(APPEND BASE_SRCS ${FTSYSTEM_SRC})
 endif ()
 
 if (WIN32)
