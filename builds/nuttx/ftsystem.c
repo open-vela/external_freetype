@@ -22,14 +22,19 @@
 #include <freetype/fterrors.h>
 #include <freetype/fttypes.h>
 #include <nuttx/config.h>
-#include <nuttx/trace.h>
+#include <nuttx/sched_note.h>
 #include <nuttx/mm/mm.h>
 #include <assert.h>
 #include <unistd.h>
 #include <fcntl.h>
 
-#define FT_TRACE_BEGIN fs_trace_begin()
-#define FT_TRACE_END fs_trace_end()
+#ifdef CONFIG_TRACE_FS
+#  define FT_TRACE_BEGIN sched_note_beginex(NOTE_TAG_FS, __func__)
+#  define FT_TRACE_END sched_note_endex(NOTE_TAG_FS, __func__)
+#else
+#  define FT_TRACE_BEGIN
+#  define FT_TRACE_END
+#endif
 
   /**************************************************************************
    *
