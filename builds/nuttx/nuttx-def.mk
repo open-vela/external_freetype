@@ -5,7 +5,7 @@
 #
 
 
-# Copyright (C) 2021 by Xiaomi Corporation.
+# Copyright (C) 2024 by Xiaomi Corporation.
 #
 # This file is part of the FreeType project, and may only be used, modified,
 # and distributed under the terms of the FreeType project license,

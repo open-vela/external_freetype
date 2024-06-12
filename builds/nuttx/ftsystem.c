@@ -4,7 +4,7 @@
  *
  *   ANSI-specific FreeType low-level system interface (body).
  *
- * Copyright (C) 2022 by Xiaomi Inc.
+ * Copyright (C) 2024 by Xiaomi Inc.
  *
  * This file is part of the FreeType project, and may only be used,
  * modified, and distributed under the terms of the FreeType project
