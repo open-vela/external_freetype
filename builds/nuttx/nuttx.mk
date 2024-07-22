@@ -21,6 +21,9 @@ CC = $(OLD_CC) -c
 LINK_LIBRARY = $(call ARLOCK, $(BIN), $(OBJECTS_LIST))
 CLEAN_LIBRARY =
 
+CFLAGS += -DFT_CONFIG_MODULES_H=\"../builds/nuttx/ftmodule.h\"
+CFLAGS += -DFT_CONFIG_OPTIONS_H=\"../builds/nuttx/ftoption.h\"
+
 FTSYS_SRC = $(PLATFORM_DIR)/ftsystem.c
 CFLAGS += -Wno-dangling-pointer
 include $(TOP_DIR)/builds/link_std.mk
